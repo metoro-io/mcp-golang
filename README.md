@@ -72,7 +72,6 @@ A maintainer will be happy to help you out.
 ### Tools
 - [x] Tool Calls
 - [x] Programatically generated tool list endpoint
-- [ ] 
 
 ### Prompts
 - [x] Prompt Calls
