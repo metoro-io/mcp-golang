@@ -54,6 +54,7 @@ You can use raw go structs as the input to your tools, the library handles gener
 
 ## Library Goals and non-goals
 
+- The library should bias towards maintaining type safety, even when adding extra complexity (reflection to check types etc)
 - The libary api should be simple and easy to use for basic cases of the protocol but we are explicitly aiming to support production use cases firs
 - Where complexity arises, the library will have sane defaults and allow the user to override them if needed.
 - The library aims to support servers first and foremost, when the server features are stable, we will work on adding client support.
