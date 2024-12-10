@@ -13,38 +13,53 @@ go get github.com/metoro-io/mcp-golang
 
 ## Basic Usage
 
-Here's a simple example of creating an MCP server with a basic tool:
+Here's a simple example of creating an MCP server with a basic tool, a prompt and two resources.
 
 ```go
 package main
 
 import (
-    "fmt"
-    "github.com/metoro-io/mcp-golang/server"
-    "github.com/metoro-io/mcp-golang/transport/stdio"
+	"fmt"
+	"github.com/metoro-io/mcp-golang"
+	"github.com/metoro-io/mcp-golang/transport/stdio"
 )
 
-// Define your tool's input structure
-type GreetingArgs struct {
-    Name string `json:"name" jsonschema:"required,description=Name of the person to greet"`
+type Content struct {
+	Title       string  `json:"title" jsonschema:"required,description=The title to submit"`
+	Description *string `json:"description" jsonschema:"description=The description to submit"`
+}
+type MyFunctionsArguments struct {
+	Submitter string  `json:"submitter" jsonschema:"required,description=The name of the thing calling this tool (openai, google, claude, etc)"`
+	Content   Content `json:"content" jsonschema:"required,description=The content of the message"`
 }
 
 func main() {
 	done := make(chan struct{})
 
-    // Create a new server with stdio transport
-    s := server.NewServer(stdio.NewStdioServerTransport())
+	server := mcp_golang.NewServer(stdio.NewStdioServerTransport())
+	err := server.RegisterTool("hello", "Say hello to a person", func(arguments MyFunctionsArguments) (*mcp_golang.ToolResponse, error) {
+		return mcp_golang.NewToolReponse(mcp_golang.NewTextContent(fmt.Sprintf("Hello, %server!", arguments.Submitter))), nil
+	})
+	if err != nil {
+		panic(err)
+	}
 
-    // Register a tool
-    err := s.RegisterTool("greet", "Greet a person", func(args GreetingArgs) (*server.ToolResponse, error) {
-        greeting := fmt.Sprintf("Hello, %s!", args.Name)
-        return server.NewToolResponse(server.NewTextContent(greeting)), nil
-    })
-    if err != nil {
-        panic(err)
-    }
+	err = server.RegisterPrompt("prompt_test", "This is a test prompt", func(arguments Content) (*mcp_golang.PromptResponse, error) {
+		return mcp_golang.NewPromptResponse("description", mcp_golang.NewPromptMessage(mcp_golang.NewTextContent(fmt.Sprintf("Hello, %server!", arguments.Title)), mcp_golang.RoleUser)), nil
+	})
+	if err != nil {
+		panic(err)
+	}
 
-	err = s.Serve()
+	err = server.RegisterResource("test://resource", "resource_test", "This is a test resource", "application/json", func() (*mcp_golang.ResourceResponse, error) {
+		return mcp_golang.NewResourceResponse(mcp_golang.NewTextEmbeddedResource("test://resource", "This is a test resource", "application/json")), nil
+	})
+
+	err = server.RegisterResource("file://app_logs", "app_logs", "The app logs", "text/plain", func() (*mcp_golang.ResourceResponse, error) {
+		return mcp_golang.NewResourceResponse(mcp_golang.NewTextEmbeddedResource("file://app_logs", "This is a test resource", "text/plain")), nil
+	})
+
+	err = server.Serve()
 	if err != nil {
 		panic(err)
 	}
