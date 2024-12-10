@@ -30,6 +30,8 @@ type GreetingArgs struct {
 }
 
 func main() {
+	done := make(chan struct{})
+
     // Create a new server with stdio transport
     s := server.NewServer(stdio.NewStdioServerTransport())
 
@@ -42,10 +44,12 @@ func main() {
         panic(err)
     }
 
-    // Start the server (blocks until done)
-    if err := s.Start(); err != nil {
-        panic(err)
-    }
+	err = s.Serve()
+	if err != nil {
+		panic(err)
+	}
+
+	<-done
 }
 ```
 
