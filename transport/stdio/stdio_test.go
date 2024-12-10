@@ -1,6 +1,8 @@
 package stdio
 
 import (
+	"github.com/metoro-io/mcp-golang/transport/stdio/internal"
+	"github.com/metoro-io/mcp-golang/transport/stdio/internal/stdio"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -16,7 +18,7 @@ import (
 // 5. Buffer clearing works as expected
 // This is a critical test as message framing is fundamental to the protocol.
 func TestReadBuffer(t *testing.T) {
-	rb := NewReadBuffer()
+	rb := stdio.NewReadBuffer()
 
 	// Test empty buffer
 	msg, err := rb.ReadMessage()
@@ -97,7 +99,7 @@ func TestMessageDeserialization(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			msg, err := deserializeMessage(tt.input)
+			msg, err := internal.deserializeMessage(tt.input)
 			if err != nil {
 				t.Errorf("deserializeMessage failed: %v", err)
 			}
@@ -126,7 +128,7 @@ func TestMessageDeserialization(t *testing.T) {
 	}
 
 	t.Run("request", func(t *testing.T) {
-		msg, err := deserializeMessage(`{"jsonrpc":"2.0","id":1,"method":"test","params":{}}`)
+		msg, err := internal.deserializeMessage(`{"jsonrpc":"2.0","id":1,"method":"test","params":{}}`)
 		assert.NoError(t, err)
 		req, ok := msg.(*JSONRPCRequest)
 		assert.True(t, ok)
@@ -134,7 +136,7 @@ func TestMessageDeserialization(t *testing.T) {
 	})
 
 	t.Run("notification", func(t *testing.T) {
-		msg, err := deserializeMessage(`{"jsonrpc":"2.0","method":"test","params":{}}`)
+		msg, err := internal.deserializeMessage(`{"jsonrpc":"2.0","method":"test","params":{}}`)
 		assert.NoError(t, err)
 		notif, ok := msg.(*JSONRPCNotification)
 		assert.True(t, ok)
@@ -142,7 +144,7 @@ func TestMessageDeserialization(t *testing.T) {
 	})
 
 	t.Run("error", func(t *testing.T) {
-		msg, err := deserializeMessage(`{"jsonrpc":"2.0","id":1,"error":{"code":-32700,"message":"Parse error"}}`)
+		msg, err := internal.deserializeMessage(`{"jsonrpc":"2.0","id":1,"error":{"code":-32700,"message":"Parse error"}}`)
 		assert.NoError(t, err)
 		errMsg, ok := msg.(*JSONRPCError)
 		assert.True(t, ok)

@@ -69,7 +69,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	transport2 "github.com/metoro-io/mcp-golang/transport"
+	"github.com/metoro-io/mcp-golang/transport"
 	"sync"
 	"time"
 )
@@ -112,18 +112,18 @@ type RequestHandlerExtra struct {
 // Protocol implements MCP protocol framing on top of a pluggable transport,
 // including features like request/response linking, notifications, and progress
 type Protocol struct {
-	transport transport2.Transport
+	transport transport.Transport
 	options   *ProtocolOptions
 
 	requestMessageID int64
 	mu               sync.RWMutex
 
 	// Maps method name to request handler
-	requestHandlers map[string]func(*transport2.BaseJSONRPCRequest, RequestHandlerExtra) (interface{}, error) // Result or error
+	requestHandlers map[string]func(*transport.BaseJSONRPCRequest, RequestHandlerExtra) (interface{}, error) // Result or error
 	// Maps request ID to cancellation function
-	requestCancellers map[transport2.RequestId]context.CancelFunc
+	requestCancellers map[transport.RequestId]context.CancelFunc
 	// Maps method name to notification handler
-	notificationHandlers map[string]func(notification *transport2.BaseJSONRPCNotification) error
+	notificationHandlers map[string]func(notification *transport.BaseJSONRPCNotification) error
 	// Maps message ID to response handler
 	responseHandlers map[int64]chan *responseEnvelope
 	// Maps message ID to progress handler
@@ -134,9 +134,9 @@ type Protocol struct {
 	// Callback for when an error occurs
 	OnError func(error)
 	// Handler to invoke for any request types that do not have their own handler installed
-	FallbackRequestHandler func(request *transport2.BaseJSONRPCRequest) (interface{}, error)
+	FallbackRequestHandler func(request *transport.BaseJSONRPCRequest) (interface{}, error)
 	// Handler to invoke for any notification types that do not have their own handler installed
-	FallbackNotificationHandler func(notification *transport2.BaseJSONRPCNotification) error
+	FallbackNotificationHandler func(notification *transport.BaseJSONRPCNotification) error
 }
 
 type responseEnvelope struct {
@@ -148,9 +148,9 @@ type responseEnvelope struct {
 func NewProtocol(options *ProtocolOptions) *Protocol {
 	p := &Protocol{
 		options:              options,
-		requestHandlers:      make(map[string]func(*transport2.BaseJSONRPCRequest, RequestHandlerExtra) (interface{}, error)),
-		requestCancellers:    make(map[transport2.RequestId]context.CancelFunc),
-		notificationHandlers: make(map[string]func(*transport2.BaseJSONRPCNotification) error),
+		requestHandlers:      make(map[string]func(*transport.BaseJSONRPCRequest, RequestHandlerExtra) (interface{}, error)),
+		requestCancellers:    make(map[transport.RequestId]context.CancelFunc),
+		notificationHandlers: make(map[string]func(*transport.BaseJSONRPCNotification) error),
 		responseHandlers:     make(map[int64]chan *responseEnvelope),
 		progressHandlers:     make(map[int64]ProgressCallback),
 	}
@@ -158,7 +158,7 @@ func NewProtocol(options *ProtocolOptions) *Protocol {
 	// Set up default handlers
 	p.SetNotificationHandler("notifications/cancelled", p.handleCancelledNotification)
 	p.SetNotificationHandler("$/progress", p.handleProgressNotification)
-	p.SetRequestHandler("ping", func(req *transport2.BaseJSONRPCRequest, _ RequestHandlerExtra) (interface{}, error) {
+	p.SetRequestHandler("ping", func(req *transport.BaseJSONRPCRequest, _ RequestHandlerExtra) (interface{}, error) {
 		return Result{}, nil
 	})
 
@@ -166,27 +166,27 @@ func NewProtocol(options *ProtocolOptions) *Protocol {
 }
 
 // Connect attaches to the given transport, starts it, and starts listening for messages
-func (p *Protocol) Connect(transport transport2.Transport) error {
-	p.transport = transport
+func (p *Protocol) Connect(tr transport.Transport) error {
+	p.transport = tr
 
-	transport.SetCloseHandler(func() {
+	tr.SetCloseHandler(func() {
 		p.handleClose()
 	})
 
-	transport.SetErrorHandler(func(err error) {
+	tr.SetErrorHandler(func(err error) {
 		p.handleError(err)
 	})
 
-	transport.SetMessageHandler(func(message *transport2.BaseJsonRpcMessage) {
+	tr.SetMessageHandler(func(message *transport.BaseJsonRpcMessage) {
 		switch m := message.Type; {
-		case m == transport2.BaseMessageTypeJSONRPCRequestType:
+		case m == transport.BaseMessageTypeJSONRPCRequestType:
 			p.handleRequest(message.JsonRpcRequest)
-		case m == transport2.BaseMessageTypeJSONRPCNotificationType:
+		case m == transport.BaseMessageTypeJSONRPCNotificationType:
 			p.handleNotification(message.JsonRpcNotification)
 		}
 	})
 
-	return transport.Start(context.Background())
+	return tr.Start(context.Background())
 }
 
 func (p *Protocol) handleClose() {
@@ -194,14 +194,14 @@ func (p *Protocol) handleClose() {
 	defer p.mu.Unlock()
 
 	// Clear all handlers
-	p.requestHandlers = make(map[string]func(*transport2.BaseJSONRPCRequest, RequestHandlerExtra) (interface{}, error))
-	p.notificationHandlers = make(map[string]func(notification *transport2.BaseJSONRPCNotification) error)
+	p.requestHandlers = make(map[string]func(*transport.BaseJSONRPCRequest, RequestHandlerExtra) (interface{}, error))
+	p.notificationHandlers = make(map[string]func(notification *transport.BaseJSONRPCNotification) error)
 
 	// Cancel all pending requests
 	for _, cancel := range p.requestCancellers {
 		cancel()
 	}
-	p.requestCancellers = make(map[transport2.RequestId]context.CancelFunc)
+	p.requestCancellers = make(map[transport.RequestId]context.CancelFunc)
 
 	// Close all response channels with error
 	for id, ch := range p.responseHandlers {
@@ -223,7 +223,7 @@ func (p *Protocol) handleError(err error) {
 	}
 }
 
-func (p *Protocol) handleNotification(notification *transport2.BaseJSONRPCNotification) {
+func (p *Protocol) handleNotification(notification *transport.BaseJSONRPCNotification) {
 	p.mu.RLock()
 	handler := p.notificationHandlers[notification.Method]
 	if handler == nil {
@@ -242,11 +242,11 @@ func (p *Protocol) handleNotification(notification *transport2.BaseJSONRPCNotifi
 	}()
 }
 
-func (p *Protocol) handleRequest(request *transport2.BaseJSONRPCRequest) {
+func (p *Protocol) handleRequest(request *transport.BaseJSONRPCRequest) {
 	p.mu.RLock()
 	handler := p.requestHandlers[request.Method]
 	if handler == nil {
-		handler = func(req *transport2.BaseJSONRPCRequest, extra RequestHandlerExtra) (interface{}, error) {
+		handler = func(req *transport.BaseJSONRPCRequest, extra RequestHandlerExtra) (interface{}, error) {
 			if p.FallbackRequestHandler != nil {
 				return p.FallbackRequestHandler(req)
 			}
@@ -286,7 +286,7 @@ func (p *Protocol) handleRequest(request *transport2.BaseJSONRPCRequest) {
 	}()
 }
 
-func (p *Protocol) handleProgressNotification(notification *transport2.BaseJSONRPCNotification) error {
+func (p *Protocol) handleProgressNotification(notification *transport.BaseJSONRPCNotification) error {
 	var params struct {
 		Progress      int64 `json:"progress"`
 		Total         int64 `json:"total"`
@@ -311,10 +311,10 @@ func (p *Protocol) handleProgressNotification(notification *transport2.BaseJSONR
 	return nil
 }
 
-func (p *Protocol) handleCancelledNotification(notification *transport2.BaseJSONRPCNotification) error {
+func (p *Protocol) handleCancelledNotification(notification *transport.BaseJSONRPCNotification) error {
 	var params struct {
-		RequestId transport2.RequestId `json:"requestId"`
-		Reason    string               `json:"reason"`
+		RequestId transport.RequestId `json:"requestId"`
+		Reason    string              `json:"reason"`
 	}
 
 	if err := json.Unmarshal(notification.Params, &params); err != nil {
@@ -471,7 +471,7 @@ func (p *Protocol) sendCancelNotification(requestID int64, reason string) {
 	}
 }
 
-func (p *Protocol) sendErrorResponse(requestID transport2.RequestId, err error) {
+func (p *Protocol) sendErrorResponse(requestID transport.RequestId, err error) {
 	response := JSONRPCError{
 		Jsonrpc: "2.0",
 		Id:      requestID,
@@ -502,7 +502,7 @@ func (p *Protocol) Notification(method string, params interface{}) error {
 }
 
 // SetRequestHandler registers a handler to invoke when this protocol object receives a request with the given method
-func (p *Protocol) SetRequestHandler(method string, handler func(*transport2.BaseJSONRPCRequest, RequestHandlerExtra) (interface{}, error)) {
+func (p *Protocol) SetRequestHandler(method string, handler func(*transport.BaseJSONRPCRequest, RequestHandlerExtra) (interface{}, error)) {
 	p.mu.Lock()
 	p.requestHandlers[method] = handler
 	p.mu.Unlock()
@@ -516,7 +516,7 @@ func (p *Protocol) RemoveRequestHandler(method string) {
 }
 
 // SetNotificationHandler registers a handler to invoke when this protocol object receives a notification with the given method
-func (p *Protocol) SetNotificationHandler(method string, handler func(notification *transport2.BaseJSONRPCNotification) error) {
+func (p *Protocol) SetNotificationHandler(method string, handler func(notification *transport.BaseJSONRPCNotification) error) {
 	p.mu.Lock()
 	p.notificationHandlers[method] = handler
 	p.mu.Unlock()

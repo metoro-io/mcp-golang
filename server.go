@@ -1,12 +1,12 @@
-package server
+package mcp_golang
 
 import (
 	"encoding/json"
 	"fmt"
 	"github.com/invopop/jsonschema"
-	internaltools "github.com/metoro-io/mcp-golang/internal/tools"
-	protocol2 "github.com/metoro-io/mcp-golang/protocol"
-	transport2 "github.com/metoro-io/mcp-golang/transport"
+	"github.com/metoro-io/mcp-golang/internal/protocol"
+	"github.com/metoro-io/mcp-golang/internal/tools"
+	"github.com/metoro-io/mcp-golang/transport"
 	"reflect"
 	"strings"
 )
@@ -95,7 +95,7 @@ func (c promptResponseSent) MarshalJSON() ([]byte, error) {
 }
 
 type Server struct {
-	transport          transport2.Transport
+	transport          transport.Transport
 	tools              map[string]*tool
 	prompts            map[string]*prompt
 	resources          map[string]*resource
@@ -107,14 +107,14 @@ type Server struct {
 type prompt struct {
 	Name              string
 	Description       string
-	Handler           func(BaseGetPromptRequestParamsArguments) *promptResponseSent
-	PromptInputSchema *PromptSchema
+	Handler           func(baseGetPromptRequestParamsArguments) *promptResponseSent
+	PromptInputSchema *promptSchema
 }
 
 type tool struct {
 	Name            string
 	Description     string
-	Handler         func(BaseCallToolRequestParams) *toolResponseSent
+	Handler         func(baseCallToolRequestParams) *toolResponseSent
 	ToolInputSchema *jsonschema.Schema
 }
 
@@ -126,7 +126,7 @@ type resource struct {
 	Handler     func() *resourceResponseSent
 }
 
-func NewServer(transport transport2.Transport) *Server {
+func NewServer(transport transport.Transport) *Server {
 	return &Server{
 		transport: transport,
 		tools:     make(map[string]*tool),
@@ -228,11 +228,11 @@ func (s *Server) RegisterPrompt(name string, description string, handler any) er
 	return nil
 }
 
-func createWrappedPromptHandler(userHandler any) func(BaseGetPromptRequestParamsArguments) *promptResponseSent {
+func createWrappedPromptHandler(userHandler any) func(baseGetPromptRequestParamsArguments) *promptResponseSent {
 	handlerValue := reflect.ValueOf(userHandler)
 	handlerType := handlerValue.Type()
 	argumentType := handlerType.In(0)
-	return func(arguments BaseGetPromptRequestParamsArguments) *promptResponseSent {
+	return func(arguments baseGetPromptRequestParamsArguments) *promptResponseSent {
 		// Instantiate a struct of the type of the arguments
 		if !reflect.New(argumentType).CanInterface() {
 			return newPromptResponseSentError(fmt.Errorf("arguments must be a struct"))
@@ -280,13 +280,13 @@ func createWrappedPromptHandler(userHandler any) func(BaseGetPromptRequestParams
 // Description *string `json:"description" jsonschema:"description=The description to submit"`
 // }
 // Then we get the jsonschema for the struct where Title is a required field and Description is an optional field
-func createPromptSchemaFromHandler(handler any) *PromptSchema {
+func createPromptSchemaFromHandler(handler any) *promptSchema {
 	handlerValue := reflect.ValueOf(handler)
 	handlerType := handlerValue.Type()
 	argumentType := handlerType.In(0)
 
-	promptSchema := PromptSchema{
-		Arguments: make([]PromptSchemaArgument, argumentType.NumField()),
+	promptSchema := promptSchema{
+		Arguments: make([]promptSchemaArgument, argumentType.NumField()),
 	}
 
 	for i := 0; i < argumentType.NumField(); i++ {
@@ -306,7 +306,7 @@ func createPromptSchemaFromHandler(handler any) *PromptSchema {
 			}
 		}
 
-		promptSchema.Arguments[i] = PromptSchemaArgument{
+		promptSchema.Arguments[i] = promptSchemaArgument{
 			Name:        fieldName,
 			Description: description,
 			Required:    &required,
@@ -353,11 +353,11 @@ func createJsonSchemaFromHandler(handler any) *jsonschema.Schema {
 // This takes a user provided handler and returns a wrapped handler which can be used to actually answer requests
 // Concretely, it will deserialize the arguments and call the user provided handler and then serialize the response
 // If the handler returns an error, it will be serialized and sent back as a tool error rather than a protocol error
-func createWrappedToolHandler(userHandler any) func(BaseCallToolRequestParams) *toolResponseSent {
+func createWrappedToolHandler(userHandler any) func(baseCallToolRequestParams) *toolResponseSent {
 	handlerValue := reflect.ValueOf(userHandler)
 	handlerType := handlerValue.Type()
 	argumentType := handlerType.In(0)
-	return func(arguments BaseCallToolRequestParams) *toolResponseSent {
+	return func(arguments baseCallToolRequestParams) *toolResponseSent {
 		// Instantiate a struct of the type of the arguments
 		if !reflect.New(argumentType).CanInterface() {
 			return newToolResponseSentError(fmt.Errorf("arguments must be a struct"))
@@ -398,7 +398,7 @@ func createWrappedToolHandler(userHandler any) func(BaseCallToolRequestParams) *
 }
 
 func (s *Server) Serve() error {
-	protocol := protocol2.NewProtocol(nil)
+	protocol := protocol.NewProtocol(nil)
 	protocol.SetRequestHandler("initialize", s.handleInitialize)
 	protocol.SetRequestHandler("tools/list", s.handleListTools)
 	protocol.SetRequestHandler("tools/call", s.handleToolCalls)
@@ -409,37 +409,37 @@ func (s *Server) Serve() error {
 	return protocol.Connect(s.transport)
 }
 
-func (s *Server) handleInitialize(_ *transport2.BaseJSONRPCRequest, _ protocol2.RequestHandlerExtra) (interface{}, error) {
-	return InitializeResult{
+func (s *Server) handleInitialize(_ *transport.BaseJSONRPCRequest, _ protocol.RequestHandlerExtra) (interface{}, error) {
+	return initializeResult{
 		Meta:            nil,
 		Capabilities:    s.generateCapabilities(),
 		Instructions:    s.serverInstructions,
 		ProtocolVersion: "2024-11-05",
-		ServerInfo: Implementation{
+		ServerInfo: implementation{
 			Name:    s.serverName,
 			Version: s.serverVersion,
 		},
 	}, nil
 }
 
-func (s *Server) handleListTools(_ *transport2.BaseJSONRPCRequest, _ protocol2.RequestHandlerExtra) (interface{}, error) {
-	return internaltools.ToolsResponse{
-		Tools: func() []internaltools.ToolRetType {
-			var tools []internaltools.ToolRetType
+func (s *Server) handleListTools(_ *transport.BaseJSONRPCRequest, _ protocol.RequestHandlerExtra) (interface{}, error) {
+	return tools.ToolsResponse{
+		Tools: func() []tools.ToolRetType {
+			var ts []tools.ToolRetType
 			for _, tool := range s.tools {
-				tools = append(tools, internaltools.ToolRetType{
+				ts = append(ts, tools.ToolRetType{
 					Name:        tool.Name,
 					Description: &tool.Description,
 					InputSchema: tool.ToolInputSchema,
 				})
 			}
-			return tools
+			return ts
 		}(),
 	}, nil
 }
 
-func (s *Server) handleToolCalls(req *transport2.BaseJSONRPCRequest, _ protocol2.RequestHandlerExtra) (interface{}, error) {
-	params := BaseCallToolRequestParams{}
+func (s *Server) handleToolCalls(req *transport.BaseJSONRPCRequest, _ protocol.RequestHandlerExtra) (interface{}, error) {
+	params := baseCallToolRequestParams{}
 	// Instantiate a struct of the type of the arguments
 	err := json.Unmarshal(req.Params, &params)
 	if err != nil {
@@ -455,24 +455,24 @@ func (s *Server) handleToolCalls(req *transport2.BaseJSONRPCRequest, _ protocol2
 	return nil, fmt.Errorf("unknown tool: %s", req.Method)
 }
 
-func (s *Server) generateCapabilities() ServerCapabilities {
+func (s *Server) generateCapabilities() serverCapabilities {
 	f := false
-	return ServerCapabilities{
-		Tools: func() *ServerCapabilitiesTools {
+	return serverCapabilities{
+		Tools: func() *serverCapabilitiesTools {
 			if s.tools == nil {
 				return nil
 			}
-			return &ServerCapabilitiesTools{
+			return &serverCapabilitiesTools{
 				ListChanged: &f,
 			}
 		}(),
 	}
 }
 
-func (s *Server) handleListPrompts(request *transport2.BaseJSONRPCRequest, extra protocol2.RequestHandlerExtra) (interface{}, error) {
-	return ListPromptsResult{
-		Prompts: func() []*PromptSchema {
-			var prompts []*PromptSchema
+func (s *Server) handleListPrompts(request *transport.BaseJSONRPCRequest, extra protocol.RequestHandlerExtra) (interface{}, error) {
+	return listPromptsResult{
+		Prompts: func() []*promptSchema {
+			var prompts []*promptSchema
 			for _, prompt := range s.prompts {
 				prompts = append(prompts, prompt.PromptInputSchema)
 			}
@@ -481,12 +481,12 @@ func (s *Server) handleListPrompts(request *transport2.BaseJSONRPCRequest, extra
 	}, nil
 }
 
-func (s *Server) handleListResources(request *transport2.BaseJSONRPCRequest, extra protocol2.RequestHandlerExtra) (interface{}, error) {
-	return ListResourcesResult{
-		Resources: func() []*ResourceSchema {
-			var resources []*ResourceSchema
+func (s *Server) handleListResources(request *transport.BaseJSONRPCRequest, extra protocol.RequestHandlerExtra) (interface{}, error) {
+	return listResourcesResult{
+		Resources: func() []*resourceSchema {
+			var resources []*resourceSchema
 			for _, resource := range s.resources {
-				resources = append(resources, &ResourceSchema{
+				resources = append(resources, &resourceSchema{
 					Annotations: nil,
 					Description: &resource.Description,
 					MimeType:    &resource.mimeType,
@@ -499,8 +499,8 @@ func (s *Server) handleListResources(request *transport2.BaseJSONRPCRequest, ext
 	}, nil
 }
 
-func (s *Server) handlePromptCalls(req *transport2.BaseJSONRPCRequest, extra protocol2.RequestHandlerExtra) (interface{}, error) {
-	params := BaseGetPromptRequestParamsArguments{}
+func (s *Server) handlePromptCalls(req *transport.BaseJSONRPCRequest, extra protocol.RequestHandlerExtra) (interface{}, error) {
+	params := baseGetPromptRequestParamsArguments{}
 	// Instantiate a struct of the type of the arguments
 	err := json.Unmarshal(req.Params, &params)
 	if err != nil {
@@ -516,8 +516,8 @@ func (s *Server) handlePromptCalls(req *transport2.BaseJSONRPCRequest, extra pro
 	return nil, fmt.Errorf("unknown prompt: %s", req.Method)
 }
 
-func (s *Server) handleResourceCalls(req *transport2.BaseJSONRPCRequest, extra protocol2.RequestHandlerExtra) (interface{}, error) {
-	params := ReadResourceRequestParams{}
+func (s *Server) handleResourceCalls(req *transport.BaseJSONRPCRequest, extra protocol.RequestHandlerExtra) (interface{}, error) {
+	params := readResourceRequestParams{}
 	// Instantiate a struct of the type of the arguments
 	err := json.Unmarshal(req.Params, &params)
 	if err != nil {

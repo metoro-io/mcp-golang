@@ -1,4 +1,4 @@
-package server
+package mcp_golang
 
 // There are no arguments to the resource api
 

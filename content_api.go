@@ -1,4 +1,4 @@
-package server
+package mcp_golang
 
 import (
 	"encoding/json"
@@ -42,11 +42,11 @@ type ImageContent struct {
 	MimeType string `json:"mimeType" yaml:"mimeType" mapstructure:"mimeType"`
 }
 
-type EmbeddedResourceType string
+type embeddedResourceType string
 
 const (
-	EmbeddedResourceTypeBlob EmbeddedResourceType = "blob"
-	EmbeddedResourceTypeText EmbeddedResourceType = "text"
+	embeddedResourceTypeBlob embeddedResourceType = "blob"
+	embeddedResourceTypeText embeddedResourceType = "text"
 )
 
 type BlobResourceContents struct {
@@ -77,7 +77,7 @@ type TextResourceContents struct {
 // It is up to the client how best to render embedded resources for the benefit
 // of the LLM and/or the user.
 type EmbeddedResource struct {
-	EmbeddedResourceType EmbeddedResourceType
+	EmbeddedResourceType embeddedResourceType
 	TextResourceContents *TextResourceContents
 	BlobResourceContents *BlobResourceContents
 }
@@ -85,9 +85,9 @@ type EmbeddedResource struct {
 // Custom JSON marshaling for EmbeddedResource
 func (c EmbeddedResource) MarshalJSON() ([]byte, error) {
 	switch c.EmbeddedResourceType {
-	case EmbeddedResourceTypeBlob:
+	case embeddedResourceTypeBlob:
 		return json.Marshal(c.BlobResourceContents)
-	case EmbeddedResourceTypeText:
+	case embeddedResourceTypeText:
 		return json.Marshal(c.TextResourceContents)
 	default:
 		return nil, fmt.Errorf("unknown embedded resource type: %s", c.EmbeddedResourceType)
@@ -202,7 +202,7 @@ func NewBlobResourceContent(uri string, base64EncodedData string, mimeType strin
 	return &Content{
 		Type: ContentTypeEmbeddedResource,
 		EmbeddedResource: &EmbeddedResource{
-			EmbeddedResourceType: EmbeddedResourceTypeBlob,
+			EmbeddedResourceType: embeddedResourceTypeBlob,
 			BlobResourceContents: &BlobResourceContents{
 				Blob:     base64EncodedData,
 				MimeType: &mimeType,
@@ -218,7 +218,7 @@ func NewTextResourceContent(uri string, text string, mimeType string) *Content {
 	return &Content{
 		Type: ContentTypeEmbeddedResource,
 		EmbeddedResource: &EmbeddedResource{
-			EmbeddedResourceType: EmbeddedResourceTypeText,
+			EmbeddedResourceType: embeddedResourceTypeText,
 			TextResourceContents: &TextResourceContents{
 				MimeType: &mimeType, Text: text, Uri: uri,
 			}},
@@ -227,7 +227,7 @@ func NewTextResourceContent(uri string, text string, mimeType string) *Content {
 
 func NewTextEmbeddedResource(uri string, text string, mimeType string) *EmbeddedResource {
 	return &EmbeddedResource{
-		EmbeddedResourceType: EmbeddedResourceTypeText,
+		EmbeddedResourceType: embeddedResourceTypeText,
 		TextResourceContents: &TextResourceContents{
 			MimeType: &mimeType, Text: text, Uri: uri,
 		}}
@@ -235,7 +235,7 @@ func NewTextEmbeddedResource(uri string, text string, mimeType string) *Embedded
 
 func NewBlobEmbeddedResource(uri string, base64EncodedData string, mimeType string) *EmbeddedResource {
 	return &EmbeddedResource{
-		EmbeddedResourceType: EmbeddedResourceTypeBlob,
+		EmbeddedResourceType: embeddedResourceTypeBlob,
 		BlobResourceContents: &BlobResourceContents{
 			Blob:     base64EncodedData,
 			MimeType: &mimeType,

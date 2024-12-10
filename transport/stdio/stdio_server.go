@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/metoro-io/mcp-golang/transport"
+	"github.com/metoro-io/mcp-golang/transport/stdio/internal/stdio"
 	"io"
 	"os"
 	"sync"
@@ -17,7 +18,7 @@ type StdioServerTransport struct {
 	started   bool
 	reader    *bufio.Reader
 	writer    io.Writer
-	readBuf   *ReadBuffer
+	readBuf   *stdio.ReadBuffer
 	onClose   func()
 	onError   func(error)
 	onMessage func(message *transport.BaseJsonRpcMessage)
@@ -33,7 +34,7 @@ func NewStdioServerTransportWithIO(in io.Reader, out io.Writer) *StdioServerTran
 	return &StdioServerTransport{
 		reader:  bufio.NewReader(in),
 		writer:  out,
-		readBuf: NewReadBuffer(),
+		readBuf: stdio.NewReadBuffer(),
 	}
 }
 

@@ -1,8 +1,8 @@
-package server
+package mcp_golang
 
 import "encoding/json"
 
-type BaseGetPromptRequestParamsArguments struct {
+type baseGetPromptRequestParamsArguments struct {
 	// We will deserialize the arguments into the users struct later on
 	Arguments json.RawMessage `json:"arguments,omitempty" yaml:"arguments,omitempty" mapstructure:"arguments,omitempty"`
 
@@ -11,15 +11,15 @@ type BaseGetPromptRequestParamsArguments struct {
 }
 
 // The server's response to a prompts/list request from the client.
-type ListPromptsResult struct {
+type listPromptsResult struct {
 	// Prompts corresponds to the JSON schema field "prompts".
-	Prompts []*PromptSchema `json:"prompts" yaml:"prompts" mapstructure:"prompts"`
+	Prompts []*promptSchema `json:"prompts" yaml:"prompts" mapstructure:"prompts"`
 }
 
-// A PromptSchema or prompt template that the server offers.
-type PromptSchema struct {
+// A promptSchema or prompt template that the server offers.
+type promptSchema struct {
 	// A list of arguments to use for templating the prompt.
-	Arguments []PromptSchemaArgument `json:"arguments,omitempty" yaml:"arguments,omitempty" mapstructure:"arguments,omitempty"`
+	Arguments []promptSchemaArgument `json:"arguments,omitempty" yaml:"arguments,omitempty" mapstructure:"arguments,omitempty"`
 
 	// An optional description of what this prompt provides
 	Description *string `json:"description,omitempty" yaml:"description,omitempty" mapstructure:"description,omitempty"`
@@ -28,7 +28,7 @@ type PromptSchema struct {
 	Name string `json:"name" yaml:"name" mapstructure:"name"`
 }
 
-type PromptSchemaArgument struct {
+type promptSchemaArgument struct {
 	// A human-readable description of the argument.
 	Description *string `json:"description,omitempty" yaml:"description,omitempty" mapstructure:"description,omitempty"`
 

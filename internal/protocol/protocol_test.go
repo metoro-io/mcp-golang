@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/metoro-io/mcp-golang"
 	"testing"
 	"time"
 )

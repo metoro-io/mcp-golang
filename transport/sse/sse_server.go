@@ -3,18 +3,19 @@ package sse
 import (
 	"context"
 	"fmt"
+	sse2 "github.com/metoro-io/mcp-golang/transport/sse/internal/sse"
 	"io"
 	"net/http"
 )
 
 // SSEServerTransport implements a server-side SSE transport
 type SSEServerTransport struct {
-	transport *SSETransport
+	transport *sse2.SSETransport
 }
 
 // NewSSEServerTransport creates a new SSE server transport
 func NewSSEServerTransport(endpoint string, w http.ResponseWriter) (*SSEServerTransport, error) {
-	transport, err := NewSSETransport(endpoint, w)
+	transport, err := sse2.NewSSETransport(endpoint, w)
 	if err != nil {
 		return nil, err
 	}
@@ -40,7 +41,7 @@ func (s *SSEServerTransport) HandlePostMessage(r *http.Request) error {
 		return fmt.Errorf("unsupported Content type: %s", contentType)
 	}
 
-	body, err := io.ReadAll(io.LimitReader(r.Body, maxMessageSize))
+	body, err := io.ReadAll(io.LimitReader(r.Body, sse2.maxMessageSize))
 	if err != nil {
 		return fmt.Errorf("failed to read request body: %w", err)
 	}

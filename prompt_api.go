@@ -1,4 +1,4 @@
-package server
+package mcp_golang
 
 type PromptMessage struct {
 	Content *Content `json:"content" yaml:"content" mapstructure:"content"`

@@ -1,19 +1,19 @@
-package server
+package mcp_golang
 
-type ReadResourceRequestParams struct {
+type readResourceRequestParams struct {
 	// The URI of the resource to read. The URI can use any protocol; it is up to the
 	// server how to interpret it.
 	Uri string `json:"uri" yaml:"uri" mapstructure:"uri"`
 }
 
 // The server's response to a resources/list request from the client.
-type ListResourcesResult struct {
+type listResourcesResult struct {
 	// Resources corresponds to the JSON schema field "resources".
-	Resources []*ResourceSchema `json:"resources" yaml:"resources" mapstructure:"resources"`
+	Resources []*resourceSchema `json:"resources" yaml:"resources" mapstructure:"resources"`
 }
 
 // A known resource that the server is capable of reading.
-type ResourceSchema struct {
+type resourceSchema struct {
 	// Annotations corresponds to the JSON schema field "annotations".
 	Annotations *Annotations `json:"annotations,omitempty" yaml:"annotations,omitempty" mapstructure:"annotations,omitempty"`
 
