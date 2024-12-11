@@ -2,6 +2,7 @@ package protocol
 
 import (
 	"context"
+	"github.com/metoro-io/mcp-golang/transport"
 	"sync"
 )
 
@@ -12,17 +13,17 @@ type mockTransport struct {
 	// Callbacks
 	onClose   func()
 	onError   func(error)
-	onMessage func(JSONRPCMessage)
+	onMessage func(message *transport.BaseJsonRpcMessage)
 
 	// Test helpers
-	messages []JSONRPCMessage
+	messages []*transport.BaseJsonRpcMessage
 	closed   bool
 	started  bool
 }
 
 func newMockTransport() *mockTransport {
 	return &mockTransport{
-		messages: make([]JSONRPCMessage, 0),
+		messages: make([]*transport.BaseJsonRpcMessage, 0),
 	}
 }
 
@@ -33,7 +34,7 @@ func (t *mockTransport) Start(ctx context.Context) error {
 	return nil
 }
 
-func (t *mockTransport) Send(message JSONRPCMessage) error {
+func (t *mockTransport) Send(message *transport.BaseJsonRpcMessage) error {
 	t.mu.Lock()
 	t.messages = append(t.messages, message)
 	t.mu.Unlock()
@@ -62,7 +63,7 @@ func (t *mockTransport) SetErrorHandler(handler func(error)) {
 	t.mu.Unlock()
 }
 
-func (t *mockTransport) SetMessageHandler(handler func(JSONRPCMessage)) {
+func (t *mockTransport) SetMessageHandler(handler func(*transport.BaseJsonRpcMessage)) {
 	t.mu.Lock()
 	t.onMessage = handler
 	t.mu.Unlock()
@@ -70,7 +71,7 @@ func (t *mockTransport) SetMessageHandler(handler func(JSONRPCMessage)) {
 
 // Test helper methods
 
-func (t *mockTransport) simulateMessage(msg JSONRPCMessage) {
+func (t *mockTransport) simulateMessage(msg *transport.BaseJsonRpcMessage) {
 	t.mu.RLock()
 	handler := t.onMessage
 	t.mu.RUnlock()
@@ -88,10 +89,10 @@ func (t *mockTransport) simulateError(err error) {
 	}
 }
 
-func (t *mockTransport) getMessages() []JSONRPCMessage {
+func (t *mockTransport) getMessages() []*transport.BaseJsonRpcMessage {
 	t.mu.RLock()
 	defer t.mu.RUnlock()
-	msgs := make([]JSONRPCMessage, len(t.messages))
+	msgs := make([]*transport.BaseJsonRpcMessage, len(t.messages))
 	copy(msgs, t.messages)
 	return msgs
 }
