@@ -26,6 +26,8 @@ MCP golang is an unofficial implementaion of the [Model Context Protocol](https:
 
 Docs can be found at [https://mcpgolang.com](https://mcpgolang.com)
 
+Example MCP Server: [metoro-mcp-server](https://github.com/metoro-io/metoro-mcp-server)
+
 ## Example Usage
 
 ```go
