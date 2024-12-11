@@ -1,3 +1,7 @@
+// Package mcp_golang provides integration tests for the MCP (Machine Control Protocol) server implementation.
+// This file contains end-to-end tests that verify the server's functionality by running a real server process
+// and communicating with it through stdio transport.
+
 package mcp_golang
 
 import (
@@ -45,8 +49,18 @@ func main() {
 }
 `
 
+// testServerCode contains a simple echo server implementation used for testing.
+// It registers a single "echo" tool that returns the input message.
+
 var i = 1
 
+// TestServerIntegration performs an end-to-end test of the MCP server functionality.
+// The test follows these steps:
+// 1. Sets up a temporary Go module and builds a test server
+// 2. Starts the server process with stdio communication
+// 3. Tests server initialization
+// 4. Tests tool listing functionality
+// 5. Tests the echo tool by sending and receiving messages
 func TestServerIntegration(t *testing.T) {
 	// Get the current module's root directory
 	currentDir, err := os.Getwd()
