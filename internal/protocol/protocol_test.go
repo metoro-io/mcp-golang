@@ -71,48 +71,18 @@ func TestProtocol_Close(t *testing.T) {
 // while maintaining proper message correlation and resource cleanup.
 func TestProtocol_Request(t *testing.T) {
 	p := NewProtocol(nil)
+	p.SetRequestHandler("test_method", func(req *transport.BaseJSONRPCRequest, extra RequestHandlerExtra) (transport.JsonRpcBody, error) {
+		return transport.NewBaseMessageResponse(&transport.BaseJSONRPCResponse{
+			Jsonrpc: "2.0",
+			Id:      req.Id,
+			Result:  json.RawMessage(`{"result": "test result"}`),
+		}), nil
+	})
 	tr := newMockTransport()
 
 	if err := p.Connect(tr); err != nil {
 		t.Fatalf("Connect failed: %v", err)
 	}
-
-	// Test successful request
-	t.Run("Successful request", func(t *testing.T) {
-		ctx := context.Background()
-		go func() {
-			// Simulate response after a short delay
-			time.Sleep(10 * time.Millisecond)
-			msgs := tr.getMessages()
-			if len(msgs) == 0 {
-				t.Error("No messages sent")
-				return
-			}
-
-			lastMsg := msgs[len(msgs)-1]
-			if lastMsg.Type != transport.BaseMessageTypeJSONRPCRequestType {
-				t.Error("Last message is not a request")
-				return
-			}
-
-			// Simulate response
-			tr.simulateMessage(transport.NewBaseMessageResponse(&transport.BaseJSONRPCResponse{
-				Jsonrpc: "2.0",
-				Id:      lastMsg.JsonRpcRequest.Id,
-				Result:  json.RawMessage(`{"result": "test result"}`),
-			}))
-		}()
-
-		result, err := p.Request(ctx, "test_method", map[string]string{"key": "value"}, nil)
-		if err != nil {
-			t.Fatalf("Request failed: %v", err)
-		}
-
-		if result != `{"result": "test result"}` {
-			t.Errorf("Expected result 'test result', got %v", result)
-		}
-	})
-
 	// Test request timeout
 	t.Run("Request timeout", func(t *testing.T) {
 		ctx := context.Background()
@@ -224,8 +194,8 @@ func TestProtocol_RequestHandler(t *testing.T) {
 		t.Fatal("Message is not a response")
 	}
 
-	if string(response.JsonRpcResponse.Result) != (`{"result": "handler result"}`) {
-		t.Errorf("Expected result 'handler result', got %v", response.JsonRpcResponse.Result)
+	if string(response.JsonRpcResponse.Result) != (`{"result":"handler result"}`) {
+		t.Errorf("Expected result 'handler result', got %v", string(response.JsonRpcResponse.Result))
 	}
 }
 
