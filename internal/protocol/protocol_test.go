@@ -16,7 +16,7 @@ import (
 // 3. The protocol is ready to send and receive messages after connection
 func TestProtocol_Connect(t *testing.T) {
 	p := NewProtocol(nil)
-	transport := mcp.newMockTransport()
+	transport := newMockTransport()
 
 	if err := p.Connect(transport); err != nil {
 		t.Fatalf("Connect failed: %v", err)

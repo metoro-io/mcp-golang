@@ -66,7 +66,7 @@ func (t *StdioServerTransport) Close() error {
 }
 
 // Send sends a JSON-RPC message
-func (t *StdioServerTransport) Send(message transport.JSONRPCMessage) error {
+func (t *StdioServerTransport) Send(message *transport.BaseJsonRpcMessage) error {
 	data, err := json.Marshal(message)
 	if err != nil {
 		return fmt.Errorf("failed to marshal message: %w", err)

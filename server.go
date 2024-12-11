@@ -409,7 +409,7 @@ func (s *Server) Serve() error {
 	return protocol.Connect(s.transport)
 }
 
-func (s *Server) handleInitialize(_ *transport.BaseJSONRPCRequest, _ protocol.RequestHandlerExtra) (interface{}, error) {
+func (s *Server) handleInitialize(_ *transport.BaseJSONRPCRequest, _ protocol.RequestHandlerExtra) (transport.JsonRpcBody, error) {
 	return initializeResult{
 		Meta:            nil,
 		Capabilities:    s.generateCapabilities(),
@@ -422,7 +422,7 @@ func (s *Server) handleInitialize(_ *transport.BaseJSONRPCRequest, _ protocol.Re
 	}, nil
 }
 
-func (s *Server) handleListTools(_ *transport.BaseJSONRPCRequest, _ protocol.RequestHandlerExtra) (interface{}, error) {
+func (s *Server) handleListTools(_ *transport.BaseJSONRPCRequest, _ protocol.RequestHandlerExtra) (transport.JsonRpcBody, error) {
 	return tools.ToolsResponse{
 		Tools: func() []tools.ToolRetType {
 			var ts []tools.ToolRetType
@@ -438,7 +438,7 @@ func (s *Server) handleListTools(_ *transport.BaseJSONRPCRequest, _ protocol.Req
 	}, nil
 }
 
-func (s *Server) handleToolCalls(req *transport.BaseJSONRPCRequest, _ protocol.RequestHandlerExtra) (interface{}, error) {
+func (s *Server) handleToolCalls(req *transport.BaseJSONRPCRequest, _ protocol.RequestHandlerExtra) (transport.JsonRpcBody, error) {
 	params := baseCallToolRequestParams{}
 	// Instantiate a struct of the type of the arguments
 	err := json.Unmarshal(req.Params, &params)
@@ -469,7 +469,7 @@ func (s *Server) generateCapabilities() serverCapabilities {
 	}
 }
 
-func (s *Server) handleListPrompts(request *transport.BaseJSONRPCRequest, extra protocol.RequestHandlerExtra) (interface{}, error) {
+func (s *Server) handleListPrompts(request *transport.BaseJSONRPCRequest, extra protocol.RequestHandlerExtra) (transport.JsonRpcBody, error) {
 	return listPromptsResult{
 		Prompts: func() []*promptSchema {
 			var prompts []*promptSchema
@@ -481,7 +481,7 @@ func (s *Server) handleListPrompts(request *transport.BaseJSONRPCRequest, extra 
 	}, nil
 }
 
-func (s *Server) handleListResources(request *transport.BaseJSONRPCRequest, extra protocol.RequestHandlerExtra) (interface{}, error) {
+func (s *Server) handleListResources(request *transport.BaseJSONRPCRequest, extra protocol.RequestHandlerExtra) (transport.JsonRpcBody, error) {
 	return listResourcesResult{
 		Resources: func() []*resourceSchema {
 			var resources []*resourceSchema
@@ -499,7 +499,7 @@ func (s *Server) handleListResources(request *transport.BaseJSONRPCRequest, extr
 	}, nil
 }
 
-func (s *Server) handlePromptCalls(req *transport.BaseJSONRPCRequest, extra protocol.RequestHandlerExtra) (interface{}, error) {
+func (s *Server) handlePromptCalls(req *transport.BaseJSONRPCRequest, extra protocol.RequestHandlerExtra) (transport.JsonRpcBody, error) {
 	params := baseGetPromptRequestParamsArguments{}
 	// Instantiate a struct of the type of the arguments
 	err := json.Unmarshal(req.Params, &params)
@@ -516,7 +516,7 @@ func (s *Server) handlePromptCalls(req *transport.BaseJSONRPCRequest, extra prot
 	return nil, fmt.Errorf("unknown prompt: %s", req.Method)
 }
 
-func (s *Server) handleResourceCalls(req *transport.BaseJSONRPCRequest, extra protocol.RequestHandlerExtra) (interface{}, error) {
+func (s *Server) handleResourceCalls(req *transport.BaseJSONRPCRequest, extra protocol.RequestHandlerExtra) (transport.JsonRpcBody, error) {
 	params := readResourceRequestParams{}
 	// Instantiate a struct of the type of the arguments
 	err := json.Unmarshal(req.Params, &params)

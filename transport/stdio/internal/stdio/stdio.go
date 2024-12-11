@@ -123,14 +123,14 @@ func deserializeMessage(line string) (*transport.BaseJsonRpcMessage, error) {
 	var request transport.BaseJSONRPCRequest
 	if err := json.Unmarshal([]byte(line), &request); err == nil {
 		//println("unmarshaled request:", spew.Sdump(request))
-		return transport.NewBaseMessageRequest(request), nil
+		return transport.NewBaseMessageRequest(&request), nil
 	} else {
 		//println("unmarshaled request error:", err.Error())
 	}
 
 	var notification transport.BaseJSONRPCNotification
 	if err := json.Unmarshal([]byte(line), &notification); err == nil {
-		return transport.NewBaseMessageNotification(notification), nil
+		return transport.NewBaseMessageNotification(&notification), nil
 	}
 
 	// TODO: Add error handling and response deserialization
