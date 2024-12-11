@@ -2,10 +2,6 @@
 <img src="./resources/mcp-golang-logo.webp" height="300" alt="Statusphere logo">
 </div>
 <br/>
-<div align="center" style="font-size:46px;">
-<b>MCP Golang</b>
-</div>
-
 <div align="center">
 
 ![GitHub stars](https://img.shields.io/github/stars/metoro-io/mcp-golang?style=social)
@@ -23,6 +19,8 @@
 
 
 </div>
+
+# MCP Golang
 
 MCP golang is an unofficial implementaion of the [Model Context Protocol](https://modelcontextprotocol.io/) in Go.
 
