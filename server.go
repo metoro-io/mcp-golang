@@ -399,15 +399,15 @@ func createWrappedToolHandler(userHandler any) func(baseCallToolRequestParams) *
 }
 
 func (s *Server) Serve() error {
-	protocol := protocol.NewProtocol(nil)
-	protocol.SetRequestHandler("initialize", s.handleInitialize)
-	protocol.SetRequestHandler("tools/list", s.handleListTools)
-	protocol.SetRequestHandler("tools/call", s.handleToolCalls)
-	protocol.SetRequestHandler("prompts/list", s.handleListPrompts)
-	protocol.SetRequestHandler("prompts/get", s.handlePromptCalls)
-	protocol.SetRequestHandler("resources/list", s.handleListResources)
-	protocol.SetRequestHandler("resources/read", s.handleResourceCalls)
-	return protocol.Connect(s.transport)
+	pr := protocol.NewProtocol(nil)
+	pr.SetRequestHandler("initialize", s.handleInitialize)
+	pr.SetRequestHandler("tools/list", s.handleListTools)
+	pr.SetRequestHandler("tools/call", s.handleToolCalls)
+	pr.SetRequestHandler("prompts/list", s.handleListPrompts)
+	pr.SetRequestHandler("prompts/get", s.handlePromptCalls)
+	pr.SetRequestHandler("resources/list", s.handleListResources)
+	pr.SetRequestHandler("resources/read", s.handleResourceCalls)
+	return pr.Connect(s.transport)
 }
 
 func (s *Server) handleInitialize(_ *transport.BaseJSONRPCRequest, _ protocol.RequestHandlerExtra) (transport.JsonRpcBody, error) {
@@ -424,6 +424,7 @@ func (s *Server) handleInitialize(_ *transport.BaseJSONRPCRequest, _ protocol.Re
 }
 
 func (s *Server) handleListTools(_ *transport.BaseJSONRPCRequest, _ protocol.RequestHandlerExtra) (transport.JsonRpcBody, error) {
+	//println("listing tools")
 	return tools.ToolsResponse{
 		Tools: func() []tools.ToolRetType {
 			var ts []tools.ToolRetType

@@ -73,7 +73,7 @@ func (t *StdioServerTransport) Send(message *transport.BaseJsonRpcMessage) error
 	}
 	data = append(data, '\n')
 
-	println("serialized message:", string(data))
+	//println("serialized message:", string(data))
 
 	t.mu.Lock()
 	defer t.mu.Unlock()
@@ -136,13 +136,15 @@ func (t *StdioServerTransport) processReadBuffer() {
 	for {
 		msg, err := t.readBuf.ReadMessage()
 		if err != nil {
+			//println("error reading message:", err.Error())
 			t.handleError(err)
 			return
 		}
 		if msg == nil {
+			//println("no message")
 			return
 		}
-
+		//println("received message:", spew.Sprint(msg))
 		t.handleMessage(msg)
 	}
 }

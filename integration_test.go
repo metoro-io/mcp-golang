@@ -45,6 +45,8 @@ func main() {
 }
 `
 
+var i = 1
+
 func TestServerIntegration(t *testing.T) {
 	// Get the current module's root directory
 	currentDir, err := os.Getwd()
@@ -126,8 +128,9 @@ func TestServerIntegration(t *testing.T) {
 			Jsonrpc: "2.0",
 			Method:  method,
 			Params:  json.RawMessage(paramsBytes),
-			Id:      1,
+			Id:      transport.RequestId(i),
 		}
+		i++
 
 		reqBytes, err := json.Marshal(req)
 		if err != nil {
@@ -182,7 +185,7 @@ func TestServerIntegration(t *testing.T) {
 	time.Sleep(100 * time.Millisecond)
 
 	// Test 2: List tools
-	resp, err = sendRequest("tools/list", nil)
+	resp, err = sendRequest("tools/list", map[string]interface{}{})
 	require.NoError(t, err)
 	tools, ok := resp["result"].(map[string]interface{})["tools"].([]interface{})
 	require.True(t, ok)

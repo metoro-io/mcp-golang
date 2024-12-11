@@ -103,7 +103,6 @@ func (rb *ReadBuffer) ReadMessage() (*transport.BaseJsonRpcMessage, error) {
 			// Extract line
 			line := string(rb.buffer[:i])
 			rb.buffer = rb.buffer[i+1:]
-			//println("serialized message:", line)
 			return deserializeMessage(line)
 		}
 	}
@@ -142,8 +141,6 @@ func deserializeMessage(line string) (*transport.BaseJsonRpcMessage, error) {
 	if err := json.Unmarshal([]byte(line), &errorResponse); err == nil {
 		return transport.NewBaseMessageError(&errorResponse), nil
 	}
-
-	// TODO: Add error handling and response deserialization
 
 	// Must be a response
 	return nil, errors.New("failed to unmarshal JSON-RPC message, unrecognized type")

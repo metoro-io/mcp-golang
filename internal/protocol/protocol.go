@@ -180,6 +180,10 @@ func (p *Protocol) Connect(tr transport.Transport) error {
 			p.handleRequest(message.JsonRpcRequest)
 		case m == transport.BaseMessageTypeJSONRPCNotificationType:
 			p.handleNotification(message.JsonRpcNotification)
+		case m == transport.BaseMessageTypeJSONRPCResponseType:
+			p.handleResponse(message.JsonRpcResponse, nil)
+		case m == transport.BaseMessageTypeJSONRPCErrorType:
+			p.handleResponse(nil, message.JsonRpcError)
 		}
 	})
 
@@ -267,12 +271,14 @@ func (p *Protocol) handleRequest(request *transport.BaseJSONRPCRequest) {
 
 		result, err := handler(request, RequestHandlerExtra{Context: ctx})
 		if err != nil {
+			//println("error:", err.Error())
 			p.sendErrorResponse(request.Id, err)
 			return
 		}
 
 		jsonResult, err := json.Marshal(result)
 		if err != nil {
+			//println("error:", err.Error())
 			p.sendErrorResponse(request.Id, fmt.Errorf("failed to marshal result: %w", err))
 			return
 		}
@@ -334,8 +340,8 @@ func (p *Protocol) handleCancelledNotification(notification *transport.BaseJSONR
 	return nil
 }
 
-func (p *Protocol) handleResponse(response interface{}, errResp *transport.BaseJSONRPCError) {
-	var id transport.RequestId
+func (p *Protocol) handleResponse(response *transport.BaseJSONRPCResponse, errResp *transport.BaseJSONRPCError) {
+	var id = response.Id
 	var result interface{}
 	var err error
 
@@ -344,19 +350,7 @@ func (p *Protocol) handleResponse(response interface{}, errResp *transport.BaseJ
 		err = fmt.Errorf("RPC error %d: %s", errResp.Error.Code, errResp.Error.Message)
 	} else {
 		// Parse the response
-		resp := response.(map[string]interface{})
-		switch v := resp["id"].(type) {
-		case float64:
-			id = transport.RequestId(int64(v))
-		case int64:
-			id = transport.RequestId(v)
-		case int:
-			id = transport.RequestId(v)
-		default:
-			p.handleError(fmt.Errorf("unexpected id type: %T", resp["id"]))
-			return
-		}
-		result = resp["result"]
+		result = response.Result
 	}
 
 	p.mu.RLock()
