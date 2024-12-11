@@ -37,7 +37,8 @@
       "pages": [
         "introduction",
         "quickstart",
-        "contributing"
+        "contributing",
+        "architecture"
       ]
     }
   ],
