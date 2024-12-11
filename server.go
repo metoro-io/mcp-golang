@@ -3,12 +3,13 @@ package mcp_golang
 import (
 	"encoding/json"
 	"fmt"
+	"reflect"
+	"strings"
+
 	"github.com/invopop/jsonschema"
 	"github.com/metoro-io/mcp-golang/internal/protocol"
 	"github.com/metoro-io/mcp-golang/internal/tools"
 	"github.com/metoro-io/mcp-golang/transport"
-	"reflect"
-	"strings"
 )
 
 // Here we define the actual MCP server that users will create and run
