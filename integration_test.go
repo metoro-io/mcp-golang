@@ -179,6 +179,8 @@ func TestServerIntegration(t *testing.T) {
 	assert.Equal(t, float64(1), resp["id"])
 	assert.NotNil(t, resp["result"])
 
+	time.Sleep(100 * time.Millisecond)
+
 	// Test 2: List tools
 	resp, err = sendRequest("tools/list", nil)
 	require.NoError(t, err)
