@@ -133,6 +133,16 @@ func deserializeMessage(line string) (*transport.BaseJsonRpcMessage, error) {
 		return transport.NewBaseMessageNotification(&notification), nil
 	}
 
+	var response transport.BaseJSONRPCResponse
+	if err := json.Unmarshal([]byte(line), &response); err == nil {
+		return transport.NewBaseMessageResponse(&response), nil
+	}
+
+	var errorResponse transport.BaseJSONRPCError
+	if err := json.Unmarshal([]byte(line), &errorResponse); err == nil {
+		return transport.NewBaseMessageError(&errorResponse), nil
+	}
+
 	// TODO: Add error handling and response deserialization
 
 	// Must be a response

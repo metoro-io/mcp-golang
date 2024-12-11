@@ -1,8 +1,7 @@
 package stdio
 
 import (
-	"github.com/metoro-io/mcp-golang/transport/stdio/internal"
-	"github.com/metoro-io/mcp-golang/transport/stdio/internal/stdio"
+	"github.com/metoro-io/mcp-golang/transport"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -18,7 +17,7 @@ import (
 // 5. Buffer clearing works as expected
 // This is a critical test as message framing is fundamental to the protocol.
 func TestReadBuffer(t *testing.T) {
-	rb := stdio.NewReadBuffer()
+	rb := NewReadBuffer()
 
 	// Test empty buffer
 	msg, err := rb.ReadMessage()
@@ -73,81 +72,68 @@ func TestMessageDeserialization(t *testing.T) {
 	tests := []struct {
 		name     string
 		input    string
-		wantType interface{}
+		wantType transport.BaseMessageType
 	}{
 		{
 			name:     "request",
 			input:    `{"jsonrpc": "2.0", "method": "test", "params": {}, "id": 1}`,
-			wantType: &JSONRPCRequest{},
+			wantType: transport.BaseMessageTypeJSONRPCRequestType,
 		},
 		{
 			name:     "notification",
 			input:    `{"jsonrpc": "2.0", "method": "test", "params": {}}`,
-			wantType: &JSONRPCNotification{},
+			wantType: transport.BaseMessageTypeJSONRPCNotificationType,
 		},
 		{
 			name:     "error",
 			input:    `{"jsonrpc": "2.0", "error": {"code": -32600, "message": "Invalid Request"}, "id": 1}`,
-			wantType: &JSONRPCError{},
+			wantType: transport.BaseMessageTypeJSONRPCErrorType,
 		},
 		{
 			name:     "response",
 			input:    `{"jsonrpc": "2.0", "result": {}, "id": 1}`,
-			wantType: map[string]interface{}{},
+			wantType: transport.BaseMessageTypeJSONRPCResponseType,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			msg, err := internal.deserializeMessage(tt.input)
+			msg, err := deserializeMessage(tt.input)
 			if err != nil {
 				t.Errorf("deserializeMessage failed: %v", err)
 			}
 			if msg == nil {
 				t.Error("Expected message, got nil")
 			}
-			switch tt.wantType.(type) {
-			case *JSONRPCRequest:
-				if _, ok := msg.(*JSONRPCRequest); !ok {
-					t.Errorf("Expected *mcp.JSONRPCRequest, got %T", msg)
-				}
-			case *JSONRPCNotification:
-				if _, ok := msg.(*JSONRPCNotification); !ok {
-					t.Errorf("Expected *mcp.JSONRPCNotification, got %T", msg)
-				}
-			case *JSONRPCError:
-				if _, ok := msg.(*JSONRPCError); !ok {
-					t.Errorf("Expected *mcp.JSONRPCError, got %T", msg)
-				}
-			case map[string]interface{}:
-				if _, ok := msg.(map[string]interface{}); !ok {
-					t.Errorf("Expected map[string]interface{}, got %T", msg)
-				}
+			if msg.Type != tt.wantType {
+				t.Errorf("Expected message type %s, got %s", tt.wantType, msg.Type)
 			}
 		})
 	}
 
 	t.Run("request", func(t *testing.T) {
-		msg, err := internal.deserializeMessage(`{"jsonrpc":"2.0","id":1,"method":"test","params":{}}`)
+		msg, err := deserializeMessage(`{"jsonrpc":"2.0","id":1,"method":"test","params":{}}`)
 		assert.NoError(t, err)
-		req, ok := msg.(*JSONRPCRequest)
-		assert.True(t, ok)
-		assert.Equal(t, "2.0", req.Jsonrpc)
+		assert.Equal(t, transport.BaseMessageTypeJSONRPCRequestType, msg.Type)
+		assert.Equal(t, "2.0", msg.JsonRpcRequest.Jsonrpc)
+		assert.Equal(t, "test", msg.JsonRpcRequest.Method)
+		assert.Equal(t, transport.RequestId(1), msg.JsonRpcRequest.Id)
 	})
 
 	t.Run("notification", func(t *testing.T) {
-		msg, err := internal.deserializeMessage(`{"jsonrpc":"2.0","method":"test","params":{}}`)
+		msg, err := deserializeMessage(`{"jsonrpc":"2.0","method":"test","params":{}}`)
 		assert.NoError(t, err)
-		notif, ok := msg.(*JSONRPCNotification)
-		assert.True(t, ok)
-		assert.Equal(t, "2.0", notif.Jsonrpc)
+		assert.Equal(t, transport.BaseMessageTypeJSONRPCNotificationType, msg.Type)
+		assert.Equal(t, "2.0", msg.JsonRpcNotification.Jsonrpc)
+		assert.Equal(t, "test", msg.JsonRpcNotification.Method)
 	})
 
 	t.Run("error", func(t *testing.T) {
-		msg, err := internal.deserializeMessage(`{"jsonrpc":"2.0","id":1,"error":{"code":-32700,"message":"Parse error"}}`)
+		msg, err := deserializeMessage(`{"jsonrpc":"2.0","id":1,"error":{"code":-32700,"message":"Parse error"}}`)
 		assert.NoError(t, err)
-		errMsg, ok := msg.(*JSONRPCError)
-		assert.True(t, ok)
-		assert.Equal(t, "2.0", errMsg.Jsonrpc)
+		assert.Equal(t, transport.BaseMessageTypeJSONRPCErrorType, msg.Type)
+		assert.Equal(t, "2.0", msg.JsonRpcError.Jsonrpc)
+		assert.Equal(t, -32700, msg.JsonRpcError.Error.Code)
+		assert.Equal(t, "Parse error", msg.JsonRpcError.Error.Message)
 	})
 }

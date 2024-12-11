@@ -49,6 +49,38 @@ type BaseJSONRPCRequest struct {
 	Params json.RawMessage `json:"params,omitempty" yaml:"params,omitempty" mapstructure:"params,omitempty"`
 }
 
+// Custom Request unmarshaling
+// Requires an Id, Jsonrpc and Method
+func (m *BaseJSONRPCRequest) UnmarshalJSON(data []byte) error {
+	required := struct {
+		Id      *RequestId       `json:"id" yaml:"id" mapstructure:"id"`
+		Jsonrpc *string          `json:"jsonrpc" yaml:"jsonrpc" mapstructure:"jsonrpc"`
+		Method  *string          `json:"method" yaml:"method" mapstructure:"method"`
+		Params  *json.RawMessage `json:"params" yaml:"params" mapstructure:"params"`
+	}{}
+	err := json.Unmarshal(data, &required)
+	if err != nil {
+		return err
+	}
+	if required.Id == nil {
+		return errors.New("field id in BaseJSONRPCRequest: required")
+	}
+	if required.Jsonrpc == nil {
+		return errors.New("field jsonrpc in BaseJSONRPCRequest: required")
+	}
+	if required.Method == nil {
+		return errors.New("field method in BaseJSONRPCRequest: required")
+	}
+	if required.Params == nil {
+		return errors.New("field params in BaseJSONRPCRequest: required")
+	}
+	m.Id = *required.Id
+	m.Jsonrpc = *required.Jsonrpc
+	m.Method = *required.Method
+	m.Params = *required.Params
+	return nil
+}
+
 type BaseJSONRPCNotification struct {
 	// Jsonrpc corresponds to the JSON schema field "jsonrpc".
 	Jsonrpc string `json:"jsonrpc" yaml:"jsonrpc" mapstructure:"jsonrpc"`
@@ -59,6 +91,32 @@ type BaseJSONRPCNotification struct {
 	// Params corresponds to the JSON schema field "params".
 	// It is stored as a []byte to enable efficient marshaling and unmarshaling into custom types later on in the protocol
 	Params json.RawMessage `json:"params,omitempty" yaml:"params,omitempty" mapstructure:"params,omitempty"`
+}
+
+// Custom Notification unmarshaling
+// Requires a Jsonrpc and Method
+func (m *BaseJSONRPCNotification) UnmarshalJSON(data []byte) error {
+	required := struct {
+		Jsonrpc *string `json:"jsonrpc" yaml:"jsonrpc" mapstructure:"jsonrpc"`
+		Method  *string `json:"method" yaml:"method" mapstructure:"method"`
+		Id      *int64  `json:"id" yaml:"id" mapstructure:"id"`
+	}{}
+	err := json.Unmarshal(data, &required)
+	if err != nil {
+		return err
+	}
+	if required.Jsonrpc == nil {
+		return errors.New("field jsonrpc in BaseJSONRPCNotification: required")
+	}
+	if required.Method == nil {
+		return errors.New("field method in BaseJSONRPCNotification: required")
+	}
+	if required.Id != nil {
+		return errors.New("field id in BaseJSONRPCNotification: not allowed")
+	}
+	m.Jsonrpc = *required.Jsonrpc
+	m.Method = *required.Method
+	return nil
 }
 
 type JsonRpcBody interface{}
@@ -72,6 +130,34 @@ type BaseJSONRPCResponse struct {
 
 	// Result corresponds to the JSON schema field "result".
 	Result json.RawMessage `json:"result" yaml:"result" mapstructure:"result"`
+}
+
+// Custom Response unmarshaling
+// Requires an Id, Jsonrpc and Result
+func (m *BaseJSONRPCResponse) UnmarshalJSON(data []byte) error {
+	required := struct {
+		Id      *RequestId       `json:"id" yaml:"id" mapstructure:"id"`
+		Jsonrpc *string          `json:"jsonrpc" yaml:"jsonrpc" mapstructure:"jsonrpc"`
+		Result  *json.RawMessage `json:"result" yaml:"result" mapstructure:"result"`
+	}{}
+	err := json.Unmarshal(data, &required)
+	if err != nil {
+		return err
+	}
+	if required.Id == nil {
+		return errors.New("field id in BaseJSONRPCResponse: required")
+	}
+	if required.Jsonrpc == nil {
+		return errors.New("field jsonrpc in BaseJSONRPCResponse: required")
+	}
+	if required.Result == nil {
+		return errors.New("field result in BaseJSONRPCResponse: required")
+	}
+	m.Id = *required.Id
+	m.Jsonrpc = *required.Jsonrpc
+	m.Result = *required.Result
+
+	return err
 }
 
 type BaseMessageType string
