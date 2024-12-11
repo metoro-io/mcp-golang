@@ -2,8 +2,9 @@ package protocol
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
-	"fmt"
+	"github.com/metoro-io/mcp-golang/transport"
 	"testing"
 	"time"
 )
@@ -36,7 +37,7 @@ func TestProtocol_Connect(t *testing.T) {
 // 4. Multiple closes are handled safely
 func TestProtocol_Close(t *testing.T) {
 	p := NewProtocol(nil)
-	transport := mcp.newMockTransport()
+	transport := newMockTransport()
 
 	if err := p.Connect(transport); err != nil {
 		t.Fatalf("Connect failed: %v", err)
@@ -70,9 +71,9 @@ func TestProtocol_Close(t *testing.T) {
 // while maintaining proper message correlation and resource cleanup.
 func TestProtocol_Request(t *testing.T) {
 	p := NewProtocol(nil)
-	transport := mcp.newMockTransport()
+	tr := newMockTransport()
 
-	if err := p.Connect(transport); err != nil {
+	if err := p.Connect(tr); err != nil {
 		t.Fatalf("Connect failed: %v", err)
 	}
 
@@ -82,25 +83,24 @@ func TestProtocol_Request(t *testing.T) {
 		go func() {
 			// Simulate response after a short delay
 			time.Sleep(10 * time.Millisecond)
-			msgs := transport.getMessages()
+			msgs := tr.getMessages()
 			if len(msgs) == 0 {
 				t.Error("No messages sent")
 				return
 			}
 
 			lastMsg := msgs[len(msgs)-1]
-			req, ok := lastMsg.(map[string]interface{})
-			if !ok {
+			if lastMsg.Type != transport.BaseMessageTypeJSONRPCRequestType {
 				t.Error("Last message is not a request")
 				return
 			}
 
 			// Simulate response
-			transport.simulateMessage(map[string]interface{}{
-				"jsonrpc": "2.0",
-				"id":      req["id"],
-				"result":  "test result",
-			})
+			tr.simulateMessage(transport.NewBaseMessageResponse(&transport.BaseJSONRPCResponse{
+				Jsonrpc: "2.0",
+				Id:      lastMsg.JsonRpcRequest.Id,
+				Result:  json.RawMessage(`{"result": "test result"}`),
+			}))
 		}()
 
 		result, err := p.Request(ctx, "test_method", map[string]string{"key": "value"}, nil)
@@ -108,7 +108,7 @@ func TestProtocol_Request(t *testing.T) {
 			t.Fatalf("Request failed: %v", err)
 		}
 
-		if result != "test result" {
+		if result != `{"result": "test result"}` {
 			t.Errorf("Expected result 'test result', got %v", result)
 		}
 	})
@@ -150,9 +150,9 @@ func TestProtocol_Request(t *testing.T) {
 // 3. No response handling is attempted for notifications
 func TestProtocol_Notification(t *testing.T) {
 	p := NewProtocol(nil)
-	transport := mcp.newMockTransport()
+	tr := newMockTransport()
 
-	if err := p.Connect(transport); err != nil {
+	if err := p.Connect(tr); err != nil {
 		t.Fatalf("Connect failed: %v", err)
 	}
 
@@ -162,18 +162,18 @@ func TestProtocol_Notification(t *testing.T) {
 	}
 
 	// Check if notification was sent
-	msgs := transport.getMessages()
+	msgs := tr.getMessages()
 	if len(msgs) != 1 {
 		t.Fatalf("Expected 1 message, got %d", len(msgs))
 	}
 
-	notification, ok := msgs[0].(map[string]interface{})
-	if !ok {
+	notification := msgs[0]
+	if notification.Type != transport.BaseMessageTypeJSONRPCNotificationType {
 		t.Fatal("Message is not a notification")
 	}
 
-	if notification["method"] != "test_notification" {
-		t.Errorf("Expected method 'test_notification', got %v", notification["method"])
+	if notification.JsonRpcNotification.Method != "test_notification" {
+		t.Errorf("Expected method 'test_notification', got %v", notification.JsonRpcNotification.Method)
 	}
 }
 
@@ -186,25 +186,25 @@ func TestProtocol_Notification(t *testing.T) {
 // 4. Handler errors are properly propagated
 func TestProtocol_RequestHandler(t *testing.T) {
 	p := NewProtocol(nil)
-	transport := mcp.newMockTransport()
+	tr := newMockTransport()
 
-	if err := p.Connect(transport); err != nil {
+	if err := p.Connect(tr); err != nil {
 		t.Fatalf("Connect failed: %v", err)
 	}
 
 	// Register request handler
 	handlerCalled := false
-	p.SetRequestHandler("test_method", func(req JSONRPCRequest, extra RequestHandlerExtra) (interface{}, error) {
+	p.SetRequestHandler("test_method", func(req *transport.BaseJSONRPCRequest, extra RequestHandlerExtra) (transport.JsonRpcBody, error) {
 		handlerCalled = true
-		return "handler result", nil
+		return map[string]interface{}{"result": "handler result"}, nil
 	})
 
 	// Simulate incoming request
-	transport.simulateMessage(&JSONRPCRequest{
+	tr.simulateMessage(transport.NewBaseMessageRequest(&transport.BaseJSONRPCRequest{
 		Jsonrpc: "2.0",
 		Method:  "test_method",
-		Id:      1,
-	})
+		Params:  json.RawMessage(`{"param": "value"}`),
+	}))
 
 	// Give some time for handler to be called
 	time.Sleep(50 * time.Millisecond)
@@ -214,18 +214,18 @@ func TestProtocol_RequestHandler(t *testing.T) {
 	}
 
 	// Check response
-	msgs := transport.getMessages()
+	msgs := tr.getMessages()
 	if len(msgs) != 1 {
 		t.Fatalf("Expected 1 message, got %d", len(msgs))
 	}
 
-	response, ok := msgs[0].(map[string]interface{})
-	if !ok {
+	response := msgs[0]
+	if response.Type != transport.BaseMessageTypeJSONRPCResponseType {
 		t.Fatal("Message is not a response")
 	}
 
-	if response["result"] != "handler result" {
-		t.Errorf("Expected result 'handler result', got %v", response["result"])
+	if string(response.JsonRpcResponse.Result) != (`{"result": "handler result"}`) {
+		t.Errorf("Expected result 'handler result', got %v", response.JsonRpcResponse.Result)
 	}
 }
 
@@ -238,23 +238,26 @@ func TestProtocol_RequestHandler(t *testing.T) {
 // 4. Unknown notifications are handled gracefully
 func TestProtocol_NotificationHandler(t *testing.T) {
 	p := NewProtocol(nil)
-	transport := mcp.newMockTransport()
+	tr := newMockTransport()
 
-	if err := p.Connect(transport); err != nil {
+	if err := p.Connect(tr); err != nil {
 		t.Fatalf("Connect failed: %v", err)
 	}
 
 	// Register notification handler
 	handlerCalled := false
-	p.SetNotificationHandler("test_notification", func(notification JSONRPCNotification) error {
+	p.SetNotificationHandler("test_notification", func(notification *transport.BaseJSONRPCNotification) error {
 		handlerCalled = true
 		return nil
 	})
 
 	// Simulate incoming notification
-	transport.simulateMessage(&JSONRPCNotification{
-		Jsonrpc: "2.0",
-		Method:  "test_notification",
+	tr.simulateMessage(&transport.BaseJsonRpcMessage{
+		Type: transport.BaseMessageTypeJSONRPCNotificationType,
+		JsonRpcNotification: &transport.BaseJSONRPCNotification{
+			Jsonrpc: "2.0",
+			Method:  "test_notification",
+		},
 	})
 
 	// Give some time for handler to be called
@@ -274,9 +277,9 @@ func TestProtocol_NotificationHandler(t *testing.T) {
 // 4. Progress handling works alongside normal request processing
 func TestProtocol_Progress(t *testing.T) {
 	p := NewProtocol(nil)
-	transport := mcp.newMockTransport()
+	tr := newMockTransport()
 
-	if err := p.Connect(transport); err != nil {
+	if err := p.Connect(tr); err != nil {
 		t.Fatalf("Connect failed: %v", err)
 	}
 
@@ -300,19 +303,21 @@ func TestProtocol_Progress(t *testing.T) {
 	time.Sleep(10 * time.Millisecond)
 
 	// Get the progress token from the sent request
-	msgs := transport.getMessages()
+	msgs := tr.getMessages()
 	if len(msgs) == 0 {
 		t.Fatal("No messages sent")
 	}
 
-	req, ok := msgs[0].(map[string]interface{})
-	if !ok {
+	req := msgs[0]
+
+	if req.Type != transport.BaseMessageTypeJSONRPCRequestType {
 		t.Fatal("Message is not a request")
 	}
 
-	params, ok := req["params"].(map[string]interface{})
-	if !ok {
-		params = map[string]interface{}{} // If no params, create empty map
+	var params map[string]interface{}
+	err := json.Unmarshal(req.JsonRpcRequest.Params, &params)
+	if err != nil {
+		t.Fatalf("Failed to unmarshal params: %v", err)
 	}
 
 	meta, ok := params["_meta"].(map[string]interface{})
@@ -323,14 +328,19 @@ func TestProtocol_Progress(t *testing.T) {
 	progressToken := meta["progressToken"]
 
 	// Simulate progress notification
-	transport.simulateMessage(&JSONRPCNotification{
+	marshal, err := json.Marshal(map[string]interface{}{
+		"progress":      50,
+		"total":         100,
+		"progressToken": progressToken,
+	})
+	if err != nil {
+		t.Fatalf("Failed to marshal progress: %v", err)
+	}
+	tr.simulateMessage(transport.NewBaseMessageNotification(&transport.BaseJSONRPCNotification{
 		Jsonrpc: "2.0",
 		Method:  "$/progress",
-		Params: &JSONRPCNotificationParams{
-			Meta:                 nil,
-			AdditionalProperties: fmt.Sprintf(`{"progress": 50, "total": 100, "progressToken": %v}`, progressToken),
-		},
-	})
+		Params:  marshal,
+	}))
 
 	// Wait for progress
 	select {
@@ -352,9 +362,9 @@ func TestProtocol_Progress(t *testing.T) {
 // 4. Resources are cleaned up after errors
 func TestProtocol_ErrorHandling(t *testing.T) {
 	p := NewProtocol(nil)
-	transport := mcp.newMockTransport()
+	tr := newMockTransport()
 
-	if err := p.Connect(transport); err != nil {
+	if err := p.Connect(tr); err != nil {
 		t.Fatalf("Connect failed: %v", err)
 	}
 
@@ -363,9 +373,9 @@ func TestProtocol_ErrorHandling(t *testing.T) {
 		errorReceived <- err
 	}
 
-	// Simulate transport error
+	// Simulate tr error
 	testErr := errors.New("test error")
-	transport.simulateError(testErr)
+	tr.simulateError(testErr)
 
 	// Wait for error
 	select {
