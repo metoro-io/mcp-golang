@@ -9,6 +9,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/metoro-io/mcp-golang/transport"
 	"github.com/stretchr/testify/assert"
@@ -90,10 +91,29 @@ func TestServerIntegration(t *testing.T) {
 	require.NoError(t, err)
 	stdout, err := serverProc.StdoutPipe()
 	require.NoError(t, err)
+	stderr, err := serverProc.StderrPipe()
+	require.NoError(t, err)
 
 	err = serverProc.Start()
 	require.NoError(t, err)
 	defer serverProc.Process.Kill()
+
+	// Start a goroutine to read stderr
+	go func() {
+		buf := make([]byte, 1024)
+		for {
+			n, err := stderr.Read(buf)
+			if err != nil {
+				if err != io.EOF {
+					t.Logf("Error reading stderr: %v", err)
+				}
+				return
+			}
+			if n > 0 {
+				t.Logf("Server stderr: %s", string(buf[:n]))
+			}
+		}
+	}()
 
 	// Helper function to send a request and read response
 	sendRequest := func(method string, params interface{}) (map[string]interface{}, error) {
@@ -115,23 +135,40 @@ func TestServerIntegration(t *testing.T) {
 		}
 		reqBytes = append(reqBytes, '\n')
 
+		t.Logf("Sending request: %s", string(reqBytes))
 		_, err = stdin.Write(reqBytes)
 		if err != nil {
 			return nil, err
 		}
 
-		// Read response
-		var buf bytes.Buffer
-		reader := io.TeeReader(stdout, &buf)
-		decoder := json.NewDecoder(reader)
+		// Read response with timeout
+		respChan := make(chan map[string]interface{}, 1)
+		errChan := make(chan error, 1)
 
-		var response map[string]interface{}
-		err = decoder.Decode(&response)
-		if err != nil {
-			return nil, fmt.Errorf("failed to decode response: %v\nraw response: %s", err, buf.String())
+		go func() {
+			var buf bytes.Buffer
+			reader := io.TeeReader(stdout, &buf)
+			decoder := json.NewDecoder(reader)
+
+			t.Log("Waiting for response...")
+			var response map[string]interface{}
+			err := decoder.Decode(&response)
+			if err != nil {
+				errChan <- fmt.Errorf("failed to decode response: %v\nraw response: %s", err, buf.String())
+				return
+			}
+			t.Logf("Got response: %+v", response)
+			respChan <- response
+		}()
+
+		select {
+		case resp := <-respChan:
+			return resp, nil
+		case err := <-errChan:
+			return nil, err
+		case <-time.After(5 * time.Second): // Increased timeout to 5 seconds
+			return nil, fmt.Errorf("timeout waiting for response")
 		}
-
-		return response, nil
 	}
 
 	// Test 1: Initialize
@@ -143,7 +180,7 @@ func TestServerIntegration(t *testing.T) {
 	assert.NotNil(t, resp["result"])
 
 	// Test 2: List tools
-	resp, err = sendRequest("listTools", nil)
+	resp, err = sendRequest("tools/list", nil)
 	require.NoError(t, err)
 	tools, ok := resp["result"].(map[string]interface{})["tools"].([]interface{})
 	require.True(t, ok)
@@ -158,7 +195,7 @@ func TestServerIntegration(t *testing.T) {
 			"message": "Hello, World!",
 		},
 	}
-	resp, err = sendRequest("toolCall", callParams)
+	resp, err = sendRequest("tools/call", callParams)
 	require.NoError(t, err)
 	result := resp["result"].(map[string]interface{})
 	content := result["content"].([]interface{})[0].(map[string]interface{})
