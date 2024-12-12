@@ -6,7 +6,7 @@ type ToolResponse struct {
 	Content []*Content
 }
 
-func NewToolReponse(content ...*Content) *ToolResponse {
+func NewToolResponse(content ...*Content) *ToolResponse {
 	return &ToolResponse{
 		Content: content,
 	}

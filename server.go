@@ -29,7 +29,7 @@ type toolResponseSent struct {
 func (c toolResponseSent) MarshalJSON() ([]byte, error) {
 	if c.Error != nil {
 		errorText := c.Error.Error()
-		c.Response = NewToolReponse(NewTextContent(errorText))
+		c.Response = NewToolResponse(NewTextContent(errorText))
 	}
 	return json.Marshal(struct {
 		Content []*Content `json:"content" yaml:"content" mapstructure:"content"`

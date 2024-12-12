@@ -29,7 +29,7 @@ func main() {
 	done := make(chan struct{})
 	server := mcp_golang.NewServer(stdio.NewStdioServerTransport())
 	err := server.RegisterTool("hello", "Say hello to a person", func(arguments HelloArguments) (*mcp_golang.ToolResponse, error) {
-		return mcp_golang.NewToolReponse(mcp_golang.NewTextContent(fmt.Sprintf("Hello, %s!", arguments.Submitter))), nil
+		return mcp_golang.NewToolResponse(mcp_golang.NewTextContent(fmt.Sprintf("Hello, %s!", arguments.Submitter))), nil
 	})
 	err = server.Serve()
 	if err != nil {

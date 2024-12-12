@@ -34,7 +34,7 @@ type EchoArgs struct {
 func main() {
 	server := mcp.NewServer(stdio.NewStdioServerTransport())
 	err := server.RegisterTool("echo", "Echo back the input message", func(args EchoArgs) (*mcp.ToolResponse, error) {
-		return mcp.NewToolReponse(mcp.NewTextContent(args.Message)), nil
+		return mcp.NewToolResponse(mcp.NewTextContent(args.Message)), nil
 	})
 	if err != nil {
 		panic(err)
