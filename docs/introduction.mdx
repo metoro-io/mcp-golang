@@ -1,0 +1,62 @@
+---
+title: Introduction
+description: 'Welcome to mcp-golang  - A Go Implementation of the Model Context Protocol'
+---
+
+<img
+  className="block dark:hidden"
+  src="/logo/mcp-golang-light.svg"
+  alt="MCP Golang Light Logo"
+/>
+<img
+  className="hidden dark:block"
+  src="/logo/mcp-golang-dark.svg"
+  alt="MCP Golang Dark Logo"
+/>
+
+## What is mcp-golang?
+
+mcp-golang is an unofficial implementation of the [Model Context Protocol](https://modelcontextprotocol.io/) in Go. It provides a robust framework for building servers that can interact with AI models through a standardized protocol.
+
+## Key Features
+
+<CardGroup cols={2}>
+  <Card
+    title="Batteries Included"
+    icon="battery-full"
+  >
+      Set up an MCP server with support for tools, resources, and prompts in just a few lines of code.
+  </Card>
+    <Card
+        title="Type Safety"
+        icon="shield-check"
+    >
+        Full Go type safety with automatic JSON schema generation from go structs.
+    </Card>
+  <Card
+    title="Composable"
+    icon="screwdriver-wrench"
+  >
+      Just take the components you need: transport, protocol or server.
+  </Card>
+  <Card
+    title="Bring your own transport"
+    icon="spinner"
+  >
+    mcp-golang has implemented the default transports: stdio and sse. If you need to implement your own transport, no problem! Use the rest of the library
+  </Card>
+
+</CardGroup>
+
+## Design Philosophy
+
+The library is designed with the following principles in mind:
+
+- **Simple API**: Easy to use for basic cases while supporting complex production use cases
+- **Sane Defaults**: Provides reasonable defaults while allowing customization
+- **Server First**: Primary focus on server implementation with future plans for client support
+- **Production Ready**: Built for reliability and performance in production environments
+
+## Getting Started
+
+To start using mcp-golang in your project, head over to our [Quickstart](/quickstart) guide. For more detailed information about development and contribution, check out our [Development](/development) guide.

@@ -1,0 +1,215 @@
+---
+title: 'Contributing'
+description: 'Guidelines for contributing to the mcp-golang project'
+---
+## Development Guide
+
+This document provides a step-by-step guide for contributing to the mcp-golang project. By no means is it complete, but it should help you get started.
+
+### Development Setup
+
+To set up your development environment, follow these steps:
+
+#### Prerequisites
+
+- Go 1.19 or higher
+- Git
+
+#### Local Development
+
+1. Clone the repository:
+```bash
+git clone https://github.com/metoro-io/mcp-golang.git
+cd mcp-golang
+```
+
+2. Install dependencies:
+```bash
+go mod download
+```
+
+3. Run tests:
+```bash
+go test ./...
+```
+
+### Project Structure
+
+The project is organized into several key packages:
+
+- `server/`: Core server implementation
+- `transport/`: Transport layer implementations (stdio, SSE)
+- `protocol/`: MCP protocol implementation
+- `examples/`: Example implementations
+- `internal/`: Internal utilities and helpers
+
+### Implementation Guidelines
+
+#### Creating a Custom Transport
+
+To implement a custom transport, create a struct that implements the `Transport` interface.
+If your transport is not part of the spec then you can add it as an experimental feature.
+Before you implement the transport, you should have a good understanding of the MCP protocol. Take a look at https://spec.modelcontextprotocol.io/specification/
+
+### Testing
+
+#### Unit Tests
+
+All new functions should have unit tests where possible. We currently use testify for this.
+Each test should explain its purpose and expected behavior. E.g.
+
+```go
+
+// TestProtocol_Request tests the core request-response functionality of the protocol.
+// This is the most important test as it covers the primary use case of the protocol.
+// It includes subtests for:
+// 1. Successful request/response with proper correlation
+// 2. Request timeout handling
+// 3. Request cancellation via context
+// These scenarios ensure the protocol can handle both successful and error cases
+// while maintaining proper message correlation and resource cleanup.
+func TestProtocol_Request(t *testing.T) {
+	p := NewProtocol(nil)
+	transport := mcp.newMockTransport()
+
+	if err := p.Connect(transport); err != nil {
+		t.Fatalf("Connect failed: %v", err)
+	}
+
+	// Test successful request
+	t.Run("Successful request", func(t *testing.T) {
+		ctx := context.Background()
+		go func() {
+			// Simulate response after a short delay
+			time.Sleep(10 * time.Millisecond)
+			msgs := transport.getMessages()
+			if len(msgs) == 0 {
+				t.Error("No messages sent")
+				return
+			}
+
+			lastMsg := msgs[len(msgs)-1]
+			req, ok := lastMsg.(map[string]interface{})
+			if !ok {
+				t.Error("Last message is not a request")
+				return
+			}
+
+			// Simulate response
+			transport.simulateMessage(map[string]interface{}{
+				"jsonrpc": "2.0",
+				"id":      req["id"],
+				"result":  "test result",
+			})
+		}()
+
+		result, err := p.Request(ctx, "test_method", map[string]string{"key": "value"}, nil)
+		if err != nil {
+			t.Fatalf("Request failed: %v", err)
+		}
+
+		if result != "test result" {
+			t.Errorf("Expected result 'test result', got %v", result)
+		}
+	})
+
+	// Test request timeout
+	t.Run("Request timeout", func(t *testing.T) {
+		ctx := context.Background()
+		opts := &RequestOptions{
+			Timeout: 50 * time.Millisecond,
+		}
+
+		_, err := p.Request(ctx, "test_method", nil, opts)
+		if err == nil {
+			t.Fatal("Expected timeout error, got nil")
+		}
+	})
+
+	// Test request cancellation
+	t.Run("Request cancellation", func(t *testing.T) {
+		ctx, cancel := context.WithCancel(context.Background())
+
+		go func() {
+			time.Sleep(10 * time.Millisecond)
+			cancel()
+		}()
+
+		_, err := p.Request(ctx, "test_method", nil, nil)
+		if !errors.Is(err, context.Canceled) {
+			t.Fatalf("Expected context.Canceled error, got %v", err)
+		}
+	})
+}
+}
+```
+
+#### Integration Tests
+
+Run integration tests that use the actual transport layers:
+
+```go
+func TestWithStdioTransport(t *testing.T) {
+    transport := stdio.NewStdioServerTransport()
+    server := server.NewServer(transport)
+    
+    // Test server with real transport
+}
+```
+
+### Contributing
+
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Add tests for new functionality
+5. Run existing tests
+6. Submit a pull request
+
+#### Pull Request Guidelines
+
+- Keep changes focused and atomic
+- Follow existing code style
+- Include tests for new functionality
+- Update documentation as needed
+- Add yourself to CONTRIBUTORS.md
+
+## Adding docs
+
+
+<Info>
+    **Prerequisite**: Please install Node.js (version 19 or higher) before proceeding.
+</Info>
+
+Follow these steps to install and run Mintlify on your operating system:
+
+**Step 1**: Install Mintlify:
+
+<CodeGroup>
+
+    ```bash npm
+    npm i -g mintlify
+    ```
+
+    ```bash yarn
+    yarn global add mintlify
+    ```
+
+</CodeGroup>
+
+**Step 2**: Navigate to the docs directory (where the `mint.json` file is located) and execute the following command:
+
+```bash
+mintlify dev
+```
+
+A local preview of your documentation will be available at `http://localhost:3000`.
+
+When your PR merges into the main branch, it will be deployed automatically.
+
+
+## Getting Help
+
+- Check existing [GitHub issues](https://github.com/metoro-io/mcp-golang/issues)
+- Join our [Discord community](https://discord.gg/33saRwE3pT)
+- Read the [Model Context Protocol specification](https://modelcontextprotocol.io/)

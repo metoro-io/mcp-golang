@@ -1,0 +1,15 @@
+---
+title: Architecture
+description: 'mcp-golang library architecture'
+---
+
+The library is split functionally into three distinct components which mimic the architecture of the MCP protocol itself:
+- **The transport layer** - which handles the actual communication between the client. This could be a TCP connection, an HTTP request, or a WebSocket connection or anything else.
+   It is reponsible for taking those underlying messages and converting them to JSON-RPC messages and taking JSON-RPC messages and converting them to underlying messages.
+- **The protocol layer** - which defines the actual protocol for the transport layer, it takes JSON-RPC messages and turns them into requests, notifications, and responses.
+   It also has a list of handlers which handle requests and notifications, it performs the JSON-RPC method routing and error handling.
+- **The server layer** - which is the actual implementation of the server, it takes the protocol layer and the transport layer and builds a server that can handle requests from clients.
+   It offers a much higher level API to the user where they can register basic handlers for tools, resources, prompts, completions, etc.
+- **The user code** itself, which are handlers. These handlers implement the business logic for the tools, resources, prompts, completions, etc and are passed to the server layer.
+
+<img src="/images/protocol-diagram.svg" alt="MCP Golang architecture diagram" />

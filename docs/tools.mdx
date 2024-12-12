@@ -1,0 +1,79 @@
+---
+title: 'Tools'
+description: 'Using tools in mcp-golang'
+---
+## What is a tool?
+
+A tool as defined in the MCP protocol is:
+
+> The Model Context Protocol (MCP) allows servers to expose tools that can be invoked by language models. Tools enable models to interact with external systems, such as querying databases, calling APIs, or performing computations. Each tool is uniquely identified by a name and includes metadata describing its schema.
+
+In MCP golang, you can register a tool with the MCP server using the `RegisterTool` function. This function takes a name, a description, and a handler that will be called when the tool is called by a client.
+
+Here's an example of spinning up a server that has a single tool:
+
+```go
+package main
+
+import (
+	"fmt"
+	"github.com/metoro-io/mcp-golang"
+	"github.com/metoro-io/mcp-golang/transport/stdio"
+)
+
+type HelloArguments struct {
+	Submitter string `json:"submitter" jsonschema:"required,description=The name of the thing calling this tool (openai or google or claude etc)'"`
+}
+
+func main() {
+	done := make(chan struct{})
+	server := mcp_golang.NewServer(stdio.NewStdioServerTransport())
+	err := server.RegisterTool("hello", "Say hello to a person", func(arguments HelloArguments) (*mcp_golang.ToolResponse, error) {
+		return mcp_golang.NewToolReponse(mcp_golang.NewTextContent(fmt.Sprintf("Hello, %s!", arguments.Submitter))), nil
+	})
+	err = server.Serve()
+	if err != nil {
+		panic(err)
+	}
+	<-done
+}
+
+```
+
+There are a few things going on in the tool registration that are worth mentioning:
+1. The `RegisterTool` function takes a name, a description, and a handler that will be called when the tool is called by a client. The information you pass to the `RegisterTool` function is used to generate the tool schema.
+   When a client calls a tool, the server will send the arguments to the handler function.
+2. The arguments of the handler function must be a single struct. That struct can be anything you like, golang-mcp will take care of serializing and deserializing the arguments to and from JSON.
+   The struct you use should have valid json and jsonschema tags. These will also be used to populate the tool schema.
+3. The return values of the handler must be a `*mcp_golang.ToolResponse` and an `error`. If you pass back an error, mcp-golang will take care of serializing it and passing it back to the client.
+
+### Schema Generation
+
+One of the main features of mcp-golang is the ability to automatically generate the schema for tools. This is done by inspecting the arguments and return values of the handler function.
+You don't have to worry about maintaining a schema manually. Just make sure your input struct is up to date and mcp-golang will take care of the rest.
+
+For the example above, this is what the mcp-protocol messages will look like
+```json
+client: {"method":"tools/list","params":{},"jsonrpc":"2.0","id":2}
+server: {"id":2,"jsonrpc":"2.0","result":{"tools":[{"description":"Say hello to a person","inputSchema":{"$schema":"https://json-schema.org/draft/2020-12/schema","properties":{"submitter":{"type":"string","description":"The name of the thing calling this tool (openai or google or claude etc)'"}},"type":"object","required":["submitter"]},"name":"hello"}]}}
+```
+
+Using this function in claude, looks like this:
+
+<img src="/images/tools-example-usage.png" alt="Simple Tool usage mcp-golang in claude" />
+
+The underlying rpc messages for the call itself look like this:
+
+```json
+client: {"method":"tools/call","params":{"name":"hello","arguments":{"submitter":"claude"}},"jsonrpc":"2.0","id":10}
+server: {"id":10,"jsonrpc":"2.0","result":{"content":[{"text":"Hello, claude!","type":"text"}],"isError":false}}
+```
+
+
+### Tool Arguments
+
+* **Required fields** If you need the client to always provide this argument, use the `jsonschema:"required"` tag.
+* **Optional fields** All fields are optional by default. Just don't use the `jsonschema:"required"` tag.
+* **Description** Use the `jsonschema:"description"` tag to add a description to the argument.
+
+

@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/metoro-io/mcp-golang/transport"
+	"github.com/metoro-io/mcp-golang/transport/stdio/internal/stdio"
 	"io"
 	"os"
 	"sync"
@@ -17,7 +18,7 @@ type StdioServerTransport struct {
 	started   bool
 	reader    *bufio.Reader
 	writer    io.Writer
-	readBuf   *ReadBuffer
+	readBuf   *stdio.ReadBuffer
 	onClose   func()
 	onError   func(error)
 	onMessage func(message *transport.BaseJsonRpcMessage)
@@ -33,7 +34,7 @@ func NewStdioServerTransportWithIO(in io.Reader, out io.Writer) *StdioServerTran
 	return &StdioServerTransport{
 		reader:  bufio.NewReader(in),
 		writer:  out,
-		readBuf: NewReadBuffer(),
+		readBuf: stdio.NewReadBuffer(),
 	}
 }
 
@@ -65,7 +66,7 @@ func (t *StdioServerTransport) Close() error {
 }
 
 // Send sends a JSON-RPC message
-func (t *StdioServerTransport) Send(message transport.JSONRPCMessage) error {
+func (t *StdioServerTransport) Send(message *transport.BaseJsonRpcMessage) error {
 	data, err := json.Marshal(message)
 	if err != nil {
 		return fmt.Errorf("failed to marshal message: %w", err)
@@ -135,13 +136,15 @@ func (t *StdioServerTransport) processReadBuffer() {
 	for {
 		msg, err := t.readBuf.ReadMessage()
 		if err != nil {
+			//println("error reading message:", err.Error())
 			t.handleError(err)
 			return
 		}
 		if msg == nil {
+			//println("no message")
 			return
 		}
-
+		//println("received message:", spew.Sprint(msg))
 		t.handleMessage(msg)
 	}
 }

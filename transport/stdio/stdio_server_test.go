@@ -27,7 +27,7 @@ func TestStdioServerTransport(t *testing.T) {
 		})
 
 		ctx := context.Background()
-		err := transport.Start(ctx)
+		err := tr.Start(ctx)
 		assert.NoError(t, err)
 
 		// Write a test message to the input buffer
@@ -50,12 +50,13 @@ func TestStdioServerTransport(t *testing.T) {
 		}
 
 		// Verify received message
-		req, ok := receivedMsg.(*JSONRPCRequest)
+		req, ok := receivedMsg.(*transport.BaseJsonRpcMessage)
 		assert.True(t, ok)
-		assert.Equal(t, "test", req.Method)
-		assert.Equal(t, mcp.RequestId(1), req.Id)
+		assert.True(t, req.Type == transport.BaseMessageTypeJSONRPCRequestType)
+		assert.Equal(t, "test", req.JsonRpcRequest.Method)
+		assert.Equal(t, transport.RequestId(1), req.JsonRpcRequest.Id)
 
-		err = transport.Close()
+		err = tr.Close()
 		assert.NoError(t, err)
 	})
 
@@ -76,19 +77,21 @@ func TestStdioServerTransport(t *testing.T) {
 	t.Run("send message", func(t *testing.T) {
 		in := &bytes.Buffer{}
 		out := &bytes.Buffer{}
-		transport := NewStdioServerTransportWithIO(in, out)
+		tr := NewStdioServerTransportWithIO(in, out)
 
-		msg := &JSONRPCResponse{
+		result := []byte(`{"status": "ok"}`)
+
+		msg := &transport.BaseJSONRPCResponse{
 			Jsonrpc: "2.0",
-			Result:  Result{AdditionalProperties: map[string]interface{}{"status": "ok"}},
+			Result:  result,
 			Id:      1,
 		}
 
-		err := transport.Send(msg)
+		err := tr.Send(transport.NewBaseMessageResponse(msg))
 		assert.NoError(t, err)
 
 		// Verify output contains the message and newline
-		assert.Contains(t, out.String(), `{"id":1,"jsonrpc":"2.0","result":{"AdditionalProperties":{"status":"ok"}}}`)
+		assert.Contains(t, out.String(), `{"id":1,"jsonrpc":"2.0","result":{"status":"ok"}}`)
 		assert.Contains(t, out.String(), "\n")
 	})
 
@@ -133,7 +136,7 @@ func TestStdioServerTransport(t *testing.T) {
 		}
 
 		assert.NotNil(t, receivedErr)
-		assert.Contains(t, receivedErr.Error(), "unexpected end of JSON input")
+		assert.Contains(t, receivedErr.Error(), "failed to unmarshal JSON-RPC message, unrecognized type")
 
 		err = transport.Close()
 		assert.NoError(t, err)

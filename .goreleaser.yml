@@ -1,0 +1,17 @@
+version: 2
+before:
+  hooks:
+    - go mod tidy
+
+builds:
+  - skip: true
+
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - '^docs:'
+      - '^test:'
+      - '^ci:'
+      - Merge pull request
+      - Merge branch

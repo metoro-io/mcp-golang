@@ -14,8 +14,8 @@ type Transport interface {
 	// as they will implicitly call start().
 	Start(ctx context.Context) error
 
-	// Send sends a JSON-RPC message (request or response).
-	Send(message JSONRPCMessage) error
+	// Send sends a JSON-RPC message (request, notification or response).
+	Send(message *BaseJsonRpcMessage) error
 
 	// Close closes the connection.
 	Close() error
@@ -28,7 +28,7 @@ type Transport interface {
 	// Note that errors are not necessarily fatal; they are used for reporting any kind of exceptional condition out of band.
 	SetErrorHandler(handler func(error))
 
-	// SetMessageHandler sets the callback for when a message (request or response) is received over the connection.
+	// SetMessageHandler sets the callback for when a message (request, notification or response) is received over the connection.
 	// Partially deserializes the messages to pass a BaseJsonRpcMessage
 	SetMessageHandler(handler func(message *BaseJsonRpcMessage))
 }

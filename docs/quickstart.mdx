@@ -1,3 +1,21 @@
+---
+title: 'Quickstart'
+description: 'Set up your first mcp-golang server'
+---
+
+## Installation
+
+First, add mcp-golang to your project:
+
+```bash
+go get github.com/metoro-io/mcp-golang
+```
+
+## Basic Usage
+
+Here's a simple example of creating an MCP server with a basic tool, a prompt and two resources.
+
+```go
 package main
 
 import (
@@ -26,7 +44,7 @@ func main() {
 		panic(err)
 	}
 
-	err = server.RegisterPrompt("promt_test", "This is a test prompt", func(arguments Content) (*mcp_golang.PromptResponse, error) {
+	err = server.RegisterPrompt("prompt_test", "This is a test prompt", func(arguments Content) (*mcp_golang.PromptResponse, error) {
 		return mcp_golang.NewPromptResponse("description", mcp_golang.NewPromptMessage(mcp_golang.NewTextContent(fmt.Sprintf("Hello, %server!", arguments.Title)), mcp_golang.RoleUser)), nil
 	})
 	if err != nil {
@@ -48,3 +66,10 @@ func main() {
 
 	<-done
 }
+```
+
+## Next Steps
+
+- If you're interested in contributing to mcp-golang, check out [Development Guide](/development) for more detailed information
+- Join our [Discord Community](https://discord.gg/33saRwE3pT) for support
+- Visit our [GitHub Repository](https://github.com/metoro-io/mcp-golang) to contribute
