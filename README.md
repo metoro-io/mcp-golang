@@ -29,10 +29,10 @@ Write MCP servers in golang with a few lines of code.
 Docs at [https://mcpgolang.com](https://mcpgolang.com)
 
 ## Highlights
-- 🛡️Type safety. Define your tool arguments as native go structs, have mcp-golang handle the rest. Automatic schema generation, deserialization, error handling etc.
-- 🚛 Custom transports. Use the built-in transports or write your own.
-- ⚡ Low boilerplate. mcp-golang generates all the MCP endpoints for you apart from your tools, prompts and resources.
-- 🧩 Modular. The library is split into three components: transport, protocol and server. Use them all or take what you need.
+- 🛡️**Type safety** - Define your tool arguments as native go structs, have mcp-golang handle the rest. Automatic schema generation, deserialization, error handling etc.
+- 🚛 **Custom transports** - Use the built-in transports or write your own.
+- ⚡ **Low boilerplate** - mcp-golang generates all the MCP endpoints for you apart from your tools, prompts and resources.
+- 🧩 **Modular** - The library is split into three components: transport, protocol and server. Use them all or take what you need.
 
 ## Example Usage
 
