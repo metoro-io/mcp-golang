@@ -3,8 +3,10 @@ package mcp_golang
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/metoro-io/mcp-golang/internal/datastructures"
 	"reflect"
 	"strings"
+	"sync"
 
 	"github.com/invopop/jsonschema"
 	"github.com/metoro-io/mcp-golang/internal/protocol"
@@ -96,10 +98,13 @@ func (c promptResponseSent) MarshalJSON() ([]byte, error) {
 }
 
 type Server struct {
+	isRunning          bool
+	mutex              sync.Mutex
 	transport          transport.Transport
-	tools              map[string]*tool
-	prompts            map[string]*prompt
-	resources          map[string]*resource
+	protocol           *protocol.Protocol
+	tools              *datastructures.SyncMap[string, *tool]
+	prompts            *datastructures.SyncMap[string, *prompt]
+	resources          *datastructures.SyncMap[string, *resource]
 	serverInstructions *string
 	serverName         string
 	serverVersion      string
@@ -130,9 +135,9 @@ type resource struct {
 func NewServer(transport transport.Transport) *Server {
 	return &Server{
 		transport: transport,
-		tools:     make(map[string]*tool),
-		prompts:   make(map[string]*prompt),
-		resources: make(map[string]*resource),
+		tools:     new(datastructures.SyncMap[string, *tool]),
+		prompts:   new(datastructures.SyncMap[string, *prompt]),
+		resources: new(datastructures.SyncMap[string, *resource]),
 	}
 }
 
@@ -144,14 +149,31 @@ func (s *Server) RegisterTool(name string, description string, handler any) erro
 	}
 	inputSchema := createJsonSchemaFromHandler(handler)
 
-	s.tools[name] = &tool{
+	s.tools.Store(name, &tool{
 		Name:            name,
 		Description:     description,
 		Handler:         createWrappedToolHandler(handler),
 		ToolInputSchema: inputSchema,
-	}
+	})
 
 	return nil
+}
+
+func (s *Server) sendToolListChangedNotification() error {
+	if !s.isRunning {
+		return nil
+	}
+	return s.protocol.Notification("notifications/tools/list_changed", nil)
+}
+
+func (s *Server) CheckToolRegistered(name string) bool {
+	_, ok := s.tools.Load(name)
+	return ok
+}
+
+func (s *Server) DeregisterTool(name string) error {
+	s.tools.Delete(name)
+	return s.sendToolListChangedNotification()
 }
 
 func (s *Server) RegisterResource(uri string, name string, description string, mimeType string, handler any) error {
@@ -159,14 +181,31 @@ func (s *Server) RegisterResource(uri string, name string, description string, m
 	if err != nil {
 		panic(err)
 	}
-	s.resources[uri] = &resource{
+	s.resources.Store(uri, &resource{
 		Name:        name,
 		Description: description,
 		Uri:         uri,
 		mimeType:    mimeType,
 		Handler:     createWrappedResourceHandler(handler),
+	})
+	return s.sendResourceListChangedNotification()
+}
+
+func (s *Server) sendResourceListChangedNotification() error {
+	if !s.isRunning {
+		return nil
 	}
-	return nil
+	return s.protocol.Notification("notifications/resources/list_changed", nil)
+}
+
+func (s *Server) CheckResourceRegistered(uri string) bool {
+	_, ok := s.resources.Load(uri)
+	return ok
+}
+
+func (s *Server) DeregisterResource(uri string) error {
+	s.resources.Delete(uri)
+	return s.sendResourceListChangedNotification()
 }
 
 func createWrappedResourceHandler(userHandler any) func() *resourceResponseSent {
@@ -219,14 +258,31 @@ func (s *Server) RegisterPrompt(name string, description string, handler any) er
 		return err
 	}
 	promptSchema := createPromptSchemaFromHandler(handler)
-	s.prompts[name] = &prompt{
+	s.prompts.Store(name, &prompt{
 		Name:              name,
 		Description:       description,
 		Handler:           createWrappedPromptHandler(handler),
 		PromptInputSchema: promptSchema,
-	}
+	})
 
-	return nil
+	return s.sendPromptListChangedNotification()
+}
+
+func (s *Server) sendPromptListChangedNotification() error {
+	if !s.isRunning {
+		return nil
+	}
+	return s.protocol.Notification("notifications/prompts/list_changed", nil)
+}
+
+func (s *Server) CheckPromptRegistered(name string) bool {
+	_, ok := s.prompts.Load(name)
+	return ok
+}
+
+func (s *Server) DeregisterPrompt(name string) error {
+	s.prompts.Delete(name)
+	return s.sendPromptListChangedNotification()
 }
 
 func createWrappedPromptHandler(userHandler any) func(baseGetPromptRequestParamsArguments) *promptResponseSent {
@@ -399,7 +455,11 @@ func createWrappedToolHandler(userHandler any) func(baseCallToolRequestParams) *
 }
 
 func (s *Server) Serve() error {
+	if s.isRunning == true {
+		return fmt.Errorf("server is already running")
+	}
 	pr := protocol.NewProtocol(nil)
+	pr.SetRequestHandler("ping", s.handlePing)
 	pr.SetRequestHandler("initialize", s.handleInitialize)
 	pr.SetRequestHandler("tools/list", s.handleListTools)
 	pr.SetRequestHandler("tools/call", s.handleToolCalls)
@@ -407,7 +467,13 @@ func (s *Server) Serve() error {
 	pr.SetRequestHandler("prompts/get", s.handlePromptCalls)
 	pr.SetRequestHandler("resources/list", s.handleListResources)
 	pr.SetRequestHandler("resources/read", s.handleResourceCalls)
-	return pr.Connect(s.transport)
+	err := pr.Connect(s.transport)
+	if err != nil {
+		return err
+	}
+	s.protocol = pr
+	s.isRunning = true
+	return nil
 }
 
 func (s *Server) handleInitialize(_ *transport.BaseJSONRPCRequest, _ protocol.RequestHandlerExtra) (transport.JsonRpcBody, error) {
@@ -428,13 +494,14 @@ func (s *Server) handleListTools(_ *transport.BaseJSONRPCRequest, _ protocol.Req
 	return tools.ToolsResponse{
 		Tools: func() []tools.ToolRetType {
 			var ts []tools.ToolRetType
-			for _, tool := range s.tools {
+			s.tools.Range(func(k string, t *tool) bool {
 				ts = append(ts, tools.ToolRetType{
-					Name:        tool.Name,
-					Description: &tool.Description,
-					InputSchema: tool.ToolInputSchema,
+					Name:        t.Name,
+					Description: &t.Description,
+					InputSchema: t.ToolInputSchema,
 				})
-			}
+				return true
+			})
 			return ts
 		}(),
 	}, nil
@@ -448,13 +515,19 @@ func (s *Server) handleToolCalls(req *transport.BaseJSONRPCRequest, _ protocol.R
 		return nil, fmt.Errorf("failed to unmarshal arguments: %w", err)
 	}
 
-	for name, tool := range s.tools {
-		if name != params.Name {
-			continue
+	var toolToUse *tool
+	s.tools.Range(func(k string, t *tool) bool {
+		if k != params.Name {
+			return true
 		}
-		return tool.Handler(params), nil
+		toolToUse = t
+		return false
+	})
+
+	if toolToUse == nil {
+		return nil, fmt.Errorf("unknown tool: %s", req.Method)
 	}
-	return nil, fmt.Errorf("unknown tool: %s", req.Method)
+	return toolToUse.Handler(params), nil
 }
 
 func (s *Server) generateCapabilities() serverCapabilities {
@@ -475,9 +548,10 @@ func (s *Server) handleListPrompts(request *transport.BaseJSONRPCRequest, extra 
 	return listPromptsResult{
 		Prompts: func() []*promptSchema {
 			var prompts []*promptSchema
-			for _, prompt := range s.prompts {
-				prompts = append(prompts, prompt.PromptInputSchema)
-			}
+			s.prompts.Range(func(k string, p *prompt) bool {
+				prompts = append(prompts, p.PromptInputSchema)
+				return true
+			})
 			return prompts
 		}(),
 	}, nil
@@ -487,15 +561,16 @@ func (s *Server) handleListResources(request *transport.BaseJSONRPCRequest, extr
 	return listResourcesResult{
 		Resources: func() []*resourceSchema {
 			var resources []*resourceSchema
-			for _, resource := range s.resources {
+			s.resources.Range(func(k string, r *resource) bool {
 				resources = append(resources, &resourceSchema{
 					Annotations: nil,
-					Description: &resource.Description,
-					MimeType:    &resource.mimeType,
-					Name:        resource.Name,
-					Uri:         resource.Uri,
+					Description: &r.Description,
+					MimeType:    &r.mimeType,
+					Name:        r.Name,
+					Uri:         r.Uri,
 				})
-			}
+				return true
+			})
 			return resources
 		}(),
 	}, nil
@@ -509,13 +584,19 @@ func (s *Server) handlePromptCalls(req *transport.BaseJSONRPCRequest, extra prot
 		return nil, fmt.Errorf("failed to unmarshal arguments: %w", err)
 	}
 
-	for name, prompter := range s.prompts {
-		if name != params.Name {
-			continue
+	var promptToUse *prompt
+	s.prompts.Range(func(k string, p *prompt) bool {
+		if k != params.Name {
+			return true
 		}
-		return prompter.Handler(params), nil
+		promptToUse = p
+		return false
+	})
+
+	if promptToUse == nil {
+		return nil, fmt.Errorf("unknown prompt: %s", req.Method)
 	}
-	return nil, fmt.Errorf("unknown prompt: %s", req.Method)
+	return promptToUse.Handler(params), nil
 }
 
 func (s *Server) handleResourceCalls(req *transport.BaseJSONRPCRequest, extra protocol.RequestHandlerExtra) (transport.JsonRpcBody, error) {
@@ -526,13 +607,23 @@ func (s *Server) handleResourceCalls(req *transport.BaseJSONRPCRequest, extra pr
 		return nil, fmt.Errorf("failed to unmarshal arguments: %w", err)
 	}
 
-	for name, resource := range s.resources {
-		if name != params.Uri {
-			continue
+	var resourceToUse *resource
+	s.resources.Range(func(k string, r *resource) bool {
+		if k != params.Uri {
+			return true
 		}
-		return resource.Handler(), nil
+		resourceToUse = r
+		return false
+	})
+
+	if resourceToUse == nil {
+		return nil, fmt.Errorf("unknown prompt: %s", req.Method)
 	}
-	return nil, fmt.Errorf("unknown prompt: %s", req.Method)
+	return resourceToUse.Handler(), nil
+}
+
+func (s *Server) handlePing(request *transport.BaseJSONRPCRequest, extra protocol.RequestHandlerExtra) (transport.JsonRpcBody, error) {
+	return map[string]interface{}{}, nil
 }
 
 func validateToolHandler(handler any) error {
