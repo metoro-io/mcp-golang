@@ -31,7 +31,7 @@ type toolResponseSent struct {
 func (c toolResponseSent) MarshalJSON() ([]byte, error) {
 	if c.Error != nil {
 		errorText := c.Error.Error()
-		c.Response = NewToolReponse(NewTextContent(errorText))
+		c.Response = NewToolResponse(NewTextContent(errorText))
 	}
 	return json.Marshal(struct {
 		Content []*Content `json:"content" yaml:"content" mapstructure:"content"`
@@ -132,13 +132,18 @@ type resource struct {
 	Handler     func() *resourceResponseSent
 }
 
-func NewServer(transport transport.Transport) *Server {
+func NewServerWithProtocol(transport transport.Transport, protocol *protocol.Protocol) *Server {
 	return &Server{
+		protocol:  protocol,
 		transport: transport,
 		tools:     new(datastructures.SyncMap[string, *tool]),
 		prompts:   new(datastructures.SyncMap[string, *prompt]),
 		resources: new(datastructures.SyncMap[string, *resource]),
 	}
+}
+
+func NewServer(transport transport.Transport) *Server {
+	return NewServerWithProtocol(transport, protocol.NewProtocol(nil))
 }
 
 // RegisterTool registers a new tool with the server
@@ -156,7 +161,7 @@ func (s *Server) RegisterTool(name string, description string, handler any) erro
 		ToolInputSchema: inputSchema,
 	})
 
-	return nil
+	return s.sendToolListChangedNotification()
 }
 
 func (s *Server) sendToolListChangedNotification() error {
@@ -458,7 +463,7 @@ func (s *Server) Serve() error {
 	if s.isRunning == true {
 		return fmt.Errorf("server is already running")
 	}
-	pr := protocol.NewProtocol(nil)
+	pr := s.protocol
 	pr.SetRequestHandler("ping", s.handlePing)
 	pr.SetRequestHandler("initialize", s.handleInitialize)
 	pr.SetRequestHandler("tools/list", s.handleListTools)

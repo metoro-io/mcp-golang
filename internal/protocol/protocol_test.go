@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"github.com/metoro-io/mcp-golang/internal/testingutils"
 	"github.com/metoro-io/mcp-golang/transport"
 	"testing"
 	"time"
@@ -17,13 +18,13 @@ import (
 // 3. The protocol is ready to send and receive messages after connection
 func TestProtocol_Connect(t *testing.T) {
 	p := NewProtocol(nil)
-	transport := newMockTransport()
+	transport := testingutils.NewMockTransport()
 
 	if err := p.Connect(transport); err != nil {
 		t.Fatalf("Connect failed: %v", err)
 	}
 
-	if !transport.isStarted() {
+	if !transport.IsStarted() {
 		t.Error("Transport was not started")
 	}
 }
@@ -37,7 +38,7 @@ func TestProtocol_Connect(t *testing.T) {
 // 4. Multiple closes are handled safely
 func TestProtocol_Close(t *testing.T) {
 	p := NewProtocol(nil)
-	transport := newMockTransport()
+	transport := testingutils.NewMockTransport()
 
 	if err := p.Connect(transport); err != nil {
 		t.Fatalf("Connect failed: %v", err)
@@ -52,7 +53,7 @@ func TestProtocol_Close(t *testing.T) {
 		t.Fatalf("Close failed: %v", err)
 	}
 
-	if !transport.isClosed() {
+	if !transport.IsClosed() {
 		t.Error("Transport was not closed")
 	}
 
@@ -78,7 +79,7 @@ func TestProtocol_Request(t *testing.T) {
 			Result:  json.RawMessage(`{"result": "test result"}`),
 		}), nil
 	})
-	tr := newMockTransport()
+	tr := testingutils.NewMockTransport()
 
 	if err := p.Connect(tr); err != nil {
 		t.Fatalf("Connect failed: %v", err)
@@ -120,7 +121,7 @@ func TestProtocol_Request(t *testing.T) {
 // 3. No response handling is attempted for notifications
 func TestProtocol_Notification(t *testing.T) {
 	p := NewProtocol(nil)
-	tr := newMockTransport()
+	tr := testingutils.NewMockTransport()
 
 	if err := p.Connect(tr); err != nil {
 		t.Fatalf("Connect failed: %v", err)
@@ -132,7 +133,7 @@ func TestProtocol_Notification(t *testing.T) {
 	}
 
 	// Check if notification was sent
-	msgs := tr.getMessages()
+	msgs := tr.GetMessages()
 	if len(msgs) != 1 {
 		t.Fatalf("Expected 1 message, got %d", len(msgs))
 	}
@@ -156,7 +157,7 @@ func TestProtocol_Notification(t *testing.T) {
 // 4. Handler errors are properly propagated
 func TestProtocol_RequestHandler(t *testing.T) {
 	p := NewProtocol(nil)
-	tr := newMockTransport()
+	tr := testingutils.NewMockTransport()
 
 	if err := p.Connect(tr); err != nil {
 		t.Fatalf("Connect failed: %v", err)
@@ -170,7 +171,7 @@ func TestProtocol_RequestHandler(t *testing.T) {
 	})
 
 	// Simulate incoming request
-	tr.simulateMessage(transport.NewBaseMessageRequest(&transport.BaseJSONRPCRequest{
+	tr.SimulateMessage(transport.NewBaseMessageRequest(&transport.BaseJSONRPCRequest{
 		Jsonrpc: "2.0",
 		Method:  "test_method",
 		Params:  json.RawMessage(`{"param": "value"}`),
@@ -184,7 +185,7 @@ func TestProtocol_RequestHandler(t *testing.T) {
 	}
 
 	// Check response
-	msgs := tr.getMessages()
+	msgs := tr.GetMessages()
 	if len(msgs) != 1 {
 		t.Fatalf("Expected 1 message, got %d", len(msgs))
 	}
@@ -208,7 +209,7 @@ func TestProtocol_RequestHandler(t *testing.T) {
 // 4. Unknown notifications are handled gracefully
 func TestProtocol_NotificationHandler(t *testing.T) {
 	p := NewProtocol(nil)
-	tr := newMockTransport()
+	tr := testingutils.NewMockTransport()
 
 	if err := p.Connect(tr); err != nil {
 		t.Fatalf("Connect failed: %v", err)
@@ -222,7 +223,7 @@ func TestProtocol_NotificationHandler(t *testing.T) {
 	})
 
 	// Simulate incoming notification
-	tr.simulateMessage(&transport.BaseJsonRpcMessage{
+	tr.SimulateMessage(&transport.BaseJsonRpcMessage{
 		Type: transport.BaseMessageTypeJSONRPCNotificationType,
 		JsonRpcNotification: &transport.BaseJSONRPCNotification{
 			Jsonrpc: "2.0",
@@ -247,7 +248,7 @@ func TestProtocol_NotificationHandler(t *testing.T) {
 // 4. Progress handling works alongside normal request processing
 func TestProtocol_Progress(t *testing.T) {
 	p := NewProtocol(nil)
-	tr := newMockTransport()
+	tr := testingutils.NewMockTransport()
 
 	if err := p.Connect(tr); err != nil {
 		t.Fatalf("Connect failed: %v", err)
@@ -273,7 +274,7 @@ func TestProtocol_Progress(t *testing.T) {
 	time.Sleep(10 * time.Millisecond)
 
 	// Get the progress token from the sent request
-	msgs := tr.getMessages()
+	msgs := tr.GetMessages()
 	if len(msgs) == 0 {
 		t.Fatal("No messages sent")
 	}
@@ -306,7 +307,7 @@ func TestProtocol_Progress(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to marshal progress: %v", err)
 	}
-	tr.simulateMessage(transport.NewBaseMessageNotification(&transport.BaseJSONRPCNotification{
+	tr.SimulateMessage(transport.NewBaseMessageNotification(&transport.BaseJSONRPCNotification{
 		Jsonrpc: "2.0",
 		Method:  "$/progress",
 		Params:  marshal,
@@ -332,7 +333,7 @@ func TestProtocol_Progress(t *testing.T) {
 // 4. Resources are cleaned up after errors
 func TestProtocol_ErrorHandling(t *testing.T) {
 	p := NewProtocol(nil)
-	tr := newMockTransport()
+	tr := testingutils.NewMockTransport()
 
 	if err := p.Connect(tr); err != nil {
 		t.Fatalf("Connect failed: %v", err)
@@ -345,7 +346,7 @@ func TestProtocol_ErrorHandling(t *testing.T) {
 
 	// Simulate tr error
 	testErr := errors.New("test error")
-	tr.simulateError(testErr)
+	tr.SimulateError(testErr)
 
 	// Wait for error
 	select {

@@ -1,4 +1,4 @@
-package protocol
+package testingutils
 
 import (
 	"context"
@@ -6,8 +6,8 @@ import (
 	"sync"
 )
 
-// mockTransport implements Transport interface for testing
-type mockTransport struct {
+// MockTransport implements Transport interface for testing
+type MockTransport struct {
 	mu sync.RWMutex
 
 	// Callbacks
@@ -21,27 +21,27 @@ type mockTransport struct {
 	started  bool
 }
 
-func newMockTransport() *mockTransport {
-	return &mockTransport{
+func NewMockTransport() *MockTransport {
+	return &MockTransport{
 		messages: make([]*transport.BaseJsonRpcMessage, 0),
 	}
 }
 
-func (t *mockTransport) Start(ctx context.Context) error {
+func (t *MockTransport) Start(ctx context.Context) error {
 	t.mu.Lock()
 	t.started = true
 	t.mu.Unlock()
 	return nil
 }
 
-func (t *mockTransport) Send(message *transport.BaseJsonRpcMessage) error {
+func (t *MockTransport) Send(message *transport.BaseJsonRpcMessage) error {
 	t.mu.Lock()
 	t.messages = append(t.messages, message)
 	t.mu.Unlock()
 	return nil
 }
 
-func (t *mockTransport) Close() error {
+func (t *MockTransport) Close() error {
 	t.mu.Lock()
 	t.closed = true
 	t.mu.Unlock()
@@ -51,19 +51,19 @@ func (t *mockTransport) Close() error {
 	return nil
 }
 
-func (t *mockTransport) SetCloseHandler(handler func()) {
+func (t *MockTransport) SetCloseHandler(handler func()) {
 	t.mu.Lock()
 	t.onClose = handler
 	t.mu.Unlock()
 }
 
-func (t *mockTransport) SetErrorHandler(handler func(error)) {
+func (t *MockTransport) SetErrorHandler(handler func(error)) {
 	t.mu.Lock()
 	t.onError = handler
 	t.mu.Unlock()
 }
 
-func (t *mockTransport) SetMessageHandler(handler func(*transport.BaseJsonRpcMessage)) {
+func (t *MockTransport) SetMessageHandler(handler func(*transport.BaseJsonRpcMessage)) {
 	t.mu.Lock()
 	t.onMessage = handler
 	t.mu.Unlock()
@@ -71,7 +71,7 @@ func (t *mockTransport) SetMessageHandler(handler func(*transport.BaseJsonRpcMes
 
 // Test helper methods
 
-func (t *mockTransport) simulateMessage(msg *transport.BaseJsonRpcMessage) {
+func (t *MockTransport) SimulateMessage(msg *transport.BaseJsonRpcMessage) {
 	t.mu.RLock()
 	handler := t.onMessage
 	t.mu.RUnlock()
@@ -80,7 +80,7 @@ func (t *mockTransport) simulateMessage(msg *transport.BaseJsonRpcMessage) {
 	}
 }
 
-func (t *mockTransport) simulateError(err error) {
+func (t *MockTransport) SimulateError(err error) {
 	t.mu.RLock()
 	handler := t.onError
 	t.mu.RUnlock()
@@ -89,7 +89,7 @@ func (t *mockTransport) simulateError(err error) {
 	}
 }
 
-func (t *mockTransport) getMessages() []*transport.BaseJsonRpcMessage {
+func (t *MockTransport) GetMessages() []*transport.BaseJsonRpcMessage {
 	t.mu.RLock()
 	defer t.mu.RUnlock()
 	msgs := make([]*transport.BaseJsonRpcMessage, len(t.messages))
@@ -97,13 +97,13 @@ func (t *mockTransport) getMessages() []*transport.BaseJsonRpcMessage {
 	return msgs
 }
 
-func (t *mockTransport) isClosed() bool {
+func (t *MockTransport) IsClosed() bool {
 	t.mu.RLock()
 	defer t.mu.RUnlock()
 	return t.closed
 }
 
-func (t *mockTransport) isStarted() bool {
+func (t *MockTransport) IsStarted() bool {
 	t.mu.RLock()
 	defer t.mu.RUnlock()
 	return t.started

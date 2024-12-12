@@ -28,7 +28,7 @@ func main() {
 		if err != nil {
 			return nil, err
 		}
-		return mcp_golang.NewToolReponse(mcp_golang.NewTextContent(string(output))), nil
+		return mcp_golang.NewToolResponse(mcp_golang.NewTextContent(string(output))), nil
 	})
 	err = server.Serve()
 	if err != nil {
