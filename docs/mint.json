@@ -40,6 +40,12 @@
         "contributing",
         "architecture"
       ]
+    },
+    {
+      "group": "Usage Guide",
+      "pages": [
+        "tools"
+      ]
     }
   ],
   "footerSocials": {

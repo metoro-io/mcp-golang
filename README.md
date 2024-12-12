@@ -20,9 +20,9 @@
 
 </div>
 
-# MCP Golang
+# mcp-golang 
 
-MCP golang is an unofficial implementaion of the [Model Context Protocol](https://modelcontextprotocol.io/) in Go.
+mcp-golang is an unofficial implementaion of the [Model Context Protocol](https://modelcontextprotocol.io/) in Go.
 
 Docs can be found at [https://mcpgolang.com](https://mcpgolang.com)
 
@@ -31,6 +31,14 @@ Example MCP Server: [metoro-mcp-server](https://github.com/metoro-io/metoro-mcp-
 ## Example Usage
 
 ```go
+package main
+
+import (
+	"fmt"
+	"github.com/metoro-io/mcp-golang"
+	"github.com/metoro-io/mcp-golang/transport/stdio"
+)
+
 type Content struct {
 	Title       string  `json:"title" jsonschema:"required,description=The title to submit"`
 	Description *string `json:"description" jsonschema:"description=The description to submit"`
@@ -69,6 +77,7 @@ func main() {
 
 	<-done
 }
+
 ```
 
 This will start a server using the stdio transport (used by claude desktop), host a tool called "hello" that will say hello to the user who submitted it.

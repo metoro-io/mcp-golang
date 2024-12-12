@@ -102,6 +102,7 @@ func (rb *ReadBuffer) ReadMessage() (*transport.BaseJsonRpcMessage, error) {
 		if rb.buffer[i] == '\n' {
 			// Extract line
 			line := string(rb.buffer[:i])
+			println("read line: ", line)
 			rb.buffer = rb.buffer[i+1:]
 			return deserializeMessage(line)
 		}
