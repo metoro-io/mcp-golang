@@ -5,7 +5,7 @@
     "dark": "/logo/mcp-golang-dark.svg",
     "light": "/logo/mcp-golang-light.svg"
   },
-  "favicon": "/favicon.svg",
+  "favicon": "/images/favicon.svg",
   "colors": {
     "primary": "#00ADD8",
     "light": "#00ADD8",
