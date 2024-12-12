@@ -115,14 +115,17 @@ Open a PR to add your own projects!
 - [x] Tool Calls
 - [x] Native go structs as arguments
 - [x] Programatically generated tool list endpoint
+- [x] Change notifications
 
 ### Prompts
 - [x] Prompt Calls
 - [x] Programatically generated prompt list endpoint
+- [x] Change notifications
 
 ### Resources
 - [x] Resource Calls
 - [x] Programatically generated resource list endpoint
+- [x] Change notifications
 
 ### Transports
 - [x] Stdio

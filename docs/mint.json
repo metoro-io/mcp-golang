@@ -46,6 +46,12 @@
       "pages": [
         "tools"
       ]
+    },
+    {
+      "group": "Protocol Features",
+      "pages": [
+        "change-notifications"
+      ]
     }
   ],
   "footerSocials": {
