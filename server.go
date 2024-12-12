@@ -498,7 +498,7 @@ func (s *Server) handleListTools(_ *transport.BaseJSONRPCRequest, _ protocol.Req
 	//println("listing tools")
 	return tools.ToolsResponse{
 		Tools: func() []tools.ToolRetType {
-			var ts []tools.ToolRetType
+			var ts = make([]tools.ToolRetType, 0)
 			s.tools.Range(func(k string, t *tool) bool {
 				ts = append(ts, tools.ToolRetType{
 					Name:        t.Name,
@@ -552,7 +552,7 @@ func (s *Server) generateCapabilities() serverCapabilities {
 func (s *Server) handleListPrompts(request *transport.BaseJSONRPCRequest, extra protocol.RequestHandlerExtra) (transport.JsonRpcBody, error) {
 	return listPromptsResult{
 		Prompts: func() []*promptSchema {
-			var prompts []*promptSchema
+			var prompts = make([]*promptSchema, 0)
 			s.prompts.Range(func(k string, p *prompt) bool {
 				prompts = append(prompts, p.PromptInputSchema)
 				return true
@@ -565,7 +565,7 @@ func (s *Server) handleListPrompts(request *transport.BaseJSONRPCRequest, extra 
 func (s *Server) handleListResources(request *transport.BaseJSONRPCRequest, extra protocol.RequestHandlerExtra) (transport.JsonRpcBody, error) {
 	return listResourcesResult{
 		Resources: func() []*resourceSchema {
-			var resources []*resourceSchema
+			var resources = make([]*resourceSchema, 0)
 			s.resources.Range(func(k string, r *resource) bool {
 				resources = append(resources, &resourceSchema{
 					Annotations: nil,
