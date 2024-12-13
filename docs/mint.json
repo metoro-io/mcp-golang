@@ -5,6 +5,10 @@
     "dark": "/logo/mcp-golang-dark.svg",
     "light": "/logo/mcp-golang-light.svg"
   },
+  "feedback": {
+    "suggestEdit": true,
+    "thumbsRating": true
+  },
   "favicon": "/images/favicon.svg",
   "colors": {
     "primary": "#00ADD8",
