@@ -12,5 +12,6 @@ type ToolRetType struct {
 	Name string `json:"name" yaml:"name" mapstructure:"name"`
 }
 type ToolsResponse struct {
-	Tools []ToolRetType `json:"tools" yaml:"tools" mapstructure:"tools"`
+	Tools      []ToolRetType `json:"tools" yaml:"tools" mapstructure:"tools"`
+	NextCursor *string       `json:"nextCursor,omitempty" yaml:"nextCursor,omitempty" mapstructure:"nextCursor,omitempty"`
 }
