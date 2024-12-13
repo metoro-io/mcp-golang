@@ -50,7 +50,8 @@
     {
       "group": "Protocol Features",
       "pages": [
-        "change-notifications"
+        "change-notifications",
+        "pagination"
       ]
     }
   ],

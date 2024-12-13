@@ -116,16 +116,19 @@ Open a PR to add your own projects!
 - [x] Native go structs as arguments
 - [x] Programatically generated tool list endpoint
 - [x] Change notifications
+- [x] Pagination
 
 ### Prompts
 - [x] Prompt Calls
 - [x] Programatically generated prompt list endpoint
 - [x] Change notifications
+- [x] Pagination
 
 ### Resources
 - [x] Resource Calls
 - [x] Programatically generated resource list endpoint
 - [x] Change notifications
+- [x] Pagination
 
 ### Transports
 - [x] Stdio

@@ -140,6 +140,7 @@ func WithProtocol(protocol *protocol.Protocol) ServerOptions {
 	}
 }
 
+// Beware: As of 2024-12-13, it looks like Claude does not support pagination yet
 func WithPaginationLimit(limit int) ServerOptions {
 	return func(s *Server) {
 		s.paginationLimit = &limit
@@ -603,14 +604,21 @@ func (s *Server) handleToolCalls(req *transport.BaseJSONRPCRequest, _ protocol.R
 }
 
 func (s *Server) generateCapabilities() serverCapabilities {
-	f := false
+	t := false
 	return serverCapabilities{
 		Tools: func() *serverCapabilitiesTools {
-			if s.tools == nil {
-				return nil
-			}
 			return &serverCapabilitiesTools{
-				ListChanged: &f,
+				ListChanged: &t,
+			}
+		}(),
+		Prompts: func() *serverCapabilitiesPrompts {
+			return &serverCapabilitiesPrompts{
+				ListChanged: &t,
+			}
+		}(),
+		Resources: func() *serverCapabilitiesResources {
+			return &serverCapabilitiesResources{
+				ListChanged: &t,
 			}
 		}(),
 	}
