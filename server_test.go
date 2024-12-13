@@ -1,8 +1,12 @@
 package mcp_golang
 
 import (
-	"github.com/metoro-io/mcp-golang/internal/testingutils"
 	"testing"
+
+	"github.com/metoro-io/mcp-golang/internal/protocol"
+	"github.com/metoro-io/mcp-golang/internal/testingutils"
+	"github.com/metoro-io/mcp-golang/internal/tools"
+	"github.com/metoro-io/mcp-golang/transport"
 )
 
 func TestServerListChangedNotifications(t *testing.T) {
@@ -149,5 +153,112 @@ func TestServerListChangedNotifications(t *testing.T) {
 	}
 	if messages[1].JsonRpcNotification.Method != "notifications/resources/list_changed" {
 		t.Errorf("Expected resources list changed notification, got %s", messages[1].JsonRpcNotification.Method)
+	}
+}
+
+func TestHandleListToolsPagination(t *testing.T) {
+	mockTransport := testingutils.NewMockTransport()
+	server := NewServer(mockTransport)
+	err := server.Serve()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Register tools in a non alphabetical order
+	toolNames := []string{"b-tool", "a-tool", "c-tool", "e-tool", "d-tool"}
+	type testToolArgs struct {
+		Message string `json:"message" jsonschema:"required,description=A test message"`
+	}
+	for _, name := range toolNames {
+		err = server.RegisterTool(name, "Test tool "+name, func(args testToolArgs) (*ToolResponse, error) {
+			return NewToolResponse(), nil
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	// Set pagination limit to 2 items per page
+	limit := 2
+	server.paginationLimit = &limit
+
+	// Test first page (no cursor)
+	resp, err := server.handleListTools(&transport.BaseJSONRPCRequest{
+		Params: []byte(`{}`),
+	}, protocol.RequestHandlerExtra{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	toolsResp, ok := resp.(tools.ToolsResponse)
+	if !ok {
+		t.Fatal("Expected tools.ToolsResponse")
+	}
+
+	// Verify first page
+	if len(toolsResp.Tools) != 2 {
+		t.Errorf("Expected 2 tools, got %d", len(toolsResp.Tools))
+	}
+	if toolsResp.Tools[0].Name != "a-tool" || toolsResp.Tools[1].Name != "b-tool" {
+		t.Errorf("Unexpected tools in first page: %v", toolsResp.Tools)
+	}
+	if toolsResp.NextCursor == nil {
+		t.Fatal("Expected next cursor for first page")
+	}
+
+	// Test second page
+	resp, err = server.handleListTools(&transport.BaseJSONRPCRequest{
+		Params: []byte(`{"cursor":"` + *toolsResp.NextCursor + `"}`),
+	}, protocol.RequestHandlerExtra{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	toolsResp, ok = resp.(tools.ToolsResponse)
+	if !ok {
+		t.Fatal("Expected tools.ToolsResponse")
+	}
+
+	// Verify second page
+	if len(toolsResp.Tools) != 2 {
+		t.Errorf("Expected 2 tools, got %d", len(toolsResp.Tools))
+	}
+	if toolsResp.Tools[0].Name != "c-tool" || toolsResp.Tools[1].Name != "d-tool" {
+		t.Errorf("Unexpected tools in second page: %v", toolsResp.Tools)
+	}
+	if toolsResp.NextCursor == nil {
+		t.Fatal("Expected next cursor for second page")
+	}
+
+	// Test last page
+	resp, err = server.handleListTools(&transport.BaseJSONRPCRequest{
+		Params: []byte(`{"cursor":"` + *toolsResp.NextCursor + `"}`),
+	}, protocol.RequestHandlerExtra{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	toolsResp, ok = resp.(tools.ToolsResponse)
+	if !ok {
+		t.Fatal("Expected tools.ToolsResponse")
+	}
+
+	// Verify last page
+	if len(toolsResp.Tools) != 1 {
+		t.Errorf("Expected 1 tool, got %d", len(toolsResp.Tools))
+	}
+	if toolsResp.Tools[0].Name != "e-tool" {
+		t.Errorf("Unexpected tool in last page: %v", toolsResp.Tools)
+	}
+	if toolsResp.NextCursor != nil {
+		t.Error("Expected no next cursor for last page")
+	}
+
+	// Test invalid cursor
+	_, err = server.handleListTools(&transport.BaseJSONRPCRequest{
+		Params: []byte(`{"cursor":"invalid-cursor"}`),
+	}, protocol.RequestHandlerExtra{})
+	if err == nil {
+		t.Error("Expected error for invalid cursor")
 	}
 }

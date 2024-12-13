@@ -537,11 +537,16 @@ func (s *Server) handleListTools(request *transport.BaseJSONRPCRequest, _ protoc
 		}
 		cString := string(c)
 		// Iterate through the tools until we find an entry > the cursor
+		found := false
 		for i := 0; i < len(orderedTools); i++ {
 			if orderedTools[i].Name > cString {
 				startPosition = i
+				found = true
 				break
 			}
+		}
+		if !found {
+			startPosition = len(orderedTools)
 		}
 	}
 	endPosition := len(orderedTools)
