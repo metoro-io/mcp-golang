@@ -68,6 +68,21 @@ func main() {
 }
 ```
 
+### Using with Claude
+Create a file in ~/Library/Application Support/Claude/claude_desktop_config.json with the following contents:
+
+```json
+{
+"mcpServers": {
+  "golang-mcp-server": {
+      "command": "<your path to golang MCP server go executable>",
+      "args": [],
+      "env": {}
+    }
+  }
+}
+```
+
 ## Next Steps
 
 - If you're interested in contributing to mcp-golang, check out [Development Guide](/development) for more detailed information

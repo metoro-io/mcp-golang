@@ -36,6 +36,8 @@ Docs at [https://mcpgolang.com](https://mcpgolang.com)
 
 ## Example Usage
 
+Install with `go get github.com/metoro-io/mcp-golang`
+
 ```go
 package main
 
@@ -90,7 +92,21 @@ func main() {
 
 This will start a server using the stdio transport (used by claude desktop), host a tool called "hello" that will say hello to the user who submitted it.
 
-You can use raw go structs as the input to your tools, the library handles generating the messages, deserialization, etc.
+### Using with Claude Desktop
+
+Create a file in ~/Library/Application Support/Claude/claude_desktop_config.json with the following contents:
+
+```json
+{
+"mcpServers": {
+  "golang-mcp-server": {
+      "command": "<your path to golang MCP server go executable>",
+      "args": [],
+      "env": {}
+    }
+  }
+}
+``` 
 
 ## Contributions
 
