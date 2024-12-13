@@ -10,6 +10,8 @@ type readResourceRequestParams struct {
 type listResourcesResult struct {
 	// Resources corresponds to the JSON schema field "resources".
 	Resources []*resourceSchema `json:"resources" yaml:"resources" mapstructure:"resources"`
+	// NextCursor is a cursor for pagination. If not nil, there are more resources available.
+	NextCursor *string `json:"nextCursor,omitempty" yaml:"nextCursor,omitempty" mapstructure:"nextCursor,omitempty"`
 }
 
 // A known resource that the server is capable of reading.

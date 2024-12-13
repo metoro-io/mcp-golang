@@ -14,6 +14,8 @@ type baseGetPromptRequestParamsArguments struct {
 type listPromptsResult struct {
 	// Prompts corresponds to the JSON schema field "prompts".
 	Prompts []*promptSchema `json:"prompts" yaml:"prompts" mapstructure:"prompts"`
+	// NextCursor is a cursor for pagination. If not nil, there are more prompts available.
+	NextCursor *string `json:"nextCursor,omitempty" yaml:"nextCursor,omitempty" mapstructure:"nextCursor,omitempty"`
 }
 
 // A promptSchema or prompt template that the server offers.
