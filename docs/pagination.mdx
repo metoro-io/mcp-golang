@@ -1,0 +1,40 @@
+# Pagination
+
+MCP-Golang supports cursor-based pagination for listing tools, prompts, and resources. This allows clients to retrieve data in manageable chunks rather than all at once.
+
+By default, pagination is disabled, but you can enable it with the `WithPaginationLimit` option.
+
+<Warning>As of 2024-12-13, it looks like Claude does not support pagination yet.</Warning>
+
+## How Pagination Works
+
+If pagination is enabled, the server will limit the number of items returned in each response to the specified limit.
+
+1. Limit the number of items returned to the specified limit
+2. Include a `nextCursor` in the response if there are more items available
+3. Accept a `cursor` parameter in subsequent requests to get the next page
+
+## Enabling Pagination
+
+Pagination is enabled by default with a limit of 2 items per page. You can modify this behavior when creating a new server:
+
+```go
+server := mcp_golang.NewServer(
+    mcp_golang.WithPaginationLimit(5), // Set items per page to 5
+)
+```
+
+To disable pagination entirely, set the pagination limit to nil:
+
+```go
+server := mcp_golang.NewServer(
+    mcp_golang.WithPaginationLimit(nil), // Disable pagination
+)
+```
+
+## Important Notes
+
+1. The cursor is opaque and should be treated as a black box by clients
+2. Cursors are valid only for the specific list operation they were generated for
+3. As of 2024-12-13, Claude does not support pagination yet
+4. The pagination limit applies to all list operations (tools, prompts, and resources)
