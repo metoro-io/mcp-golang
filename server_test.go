@@ -261,6 +261,27 @@ func TestHandleListToolsPagination(t *testing.T) {
 	if err == nil {
 		t.Error("Expected error for invalid cursor")
 	}
+
+	// Test without pagination (should return all tools)
+	server.paginationLimit = nil
+	resp, err = server.handleListTools(&transport.BaseJSONRPCRequest{
+		Params: []byte(`{}`),
+	}, protocol.RequestHandlerExtra{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	toolsResp, ok = resp.(tools.ToolsResponse)
+	if !ok {
+		t.Fatal("Expected ToolsResponse")
+	}
+
+	if len(toolsResp.Tools) != 5 {
+		t.Errorf("Expected 5 tools, got %d", len(toolsResp.Tools))
+	}
+	if toolsResp.NextCursor != nil {
+		t.Error("Expected no next cursor when pagination is disabled")
+	}
 }
 
 func TestHandleListPromptsPagination(t *testing.T) {
@@ -368,6 +389,27 @@ func TestHandleListPromptsPagination(t *testing.T) {
 	if err == nil {
 		t.Error("Expected error for invalid cursor")
 	}
+
+	// Test without pagination (should return all prompts)
+	server.paginationLimit = nil
+	resp, err = server.handleListPrompts(&transport.BaseJSONRPCRequest{
+		Params: []byte(`{}`),
+	}, protocol.RequestHandlerExtra{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	promptsResp, ok = resp.(listPromptsResult)
+	if !ok {
+		t.Fatal("Expected listPromptsResult")
+	}
+
+	if len(promptsResp.Prompts) != 5 {
+		t.Errorf("Expected 5 prompts, got %d", len(promptsResp.Prompts))
+	}
+	if promptsResp.NextCursor != nil {
+		t.Error("Expected no next cursor when pagination is disabled")
+	}
 }
 
 func TestHandleListResourcesPagination(t *testing.T) {
@@ -471,5 +513,26 @@ func TestHandleListResourcesPagination(t *testing.T) {
 	}, protocol.RequestHandlerExtra{})
 	if err == nil {
 		t.Error("Expected error for invalid cursor")
+	}
+
+	// Test without pagination (should return all resources)
+	server.paginationLimit = nil
+	resp, err = server.handleListResources(&transport.BaseJSONRPCRequest{
+		Params: []byte(`{}`),
+	}, protocol.RequestHandlerExtra{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	resourcesResp, ok = resp.(listResourcesResult)
+	if !ok {
+		t.Fatal("Expected listResourcesResult")
+	}
+
+	if len(resourcesResp.Resources) != 5 {
+		t.Errorf("Expected 5 resources, got %d", len(resourcesResp.Resources))
+	}
+	if resourcesResp.NextCursor != nil {
+		t.Error("Expected no next cursor when pagination is disabled")
 	}
 }
