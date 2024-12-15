@@ -251,6 +251,7 @@ func (p *Protocol) handleRequest(request *transport.BaseJSONRPCRequest) {
 			if p.FallbackRequestHandler != nil {
 				return p.FallbackRequestHandler(req)
 			}
+			println("no handler for method and no default handler:", req.Method)
 			return nil, fmt.Errorf("method not found: %s", req.Method)
 		}
 	}
@@ -271,14 +272,14 @@ func (p *Protocol) handleRequest(request *transport.BaseJSONRPCRequest) {
 
 		result, err := handler(request, RequestHandlerExtra{Context: ctx})
 		if err != nil {
-			//println("error:", err.Error())
+			println("error:", err.Error())
 			p.sendErrorResponse(request.Id, err)
 			return
 		}
 
 		jsonResult, err := json.Marshal(result)
 		if err != nil {
-			//println("error:", err.Error())
+			println("error:", err.Error())
 			p.sendErrorResponse(request.Id, fmt.Errorf("failed to marshal result: %w", err))
 			return
 		}
@@ -289,6 +290,7 @@ func (p *Protocol) handleRequest(request *transport.BaseJSONRPCRequest) {
 		}
 
 		if err := p.transport.Send(transport.NewBaseMessageResponse(response)); err != nil {
+			println("error:", err.Error())
 			p.handleError(fmt.Errorf("failed to send response: %w", err))
 		}
 	}()

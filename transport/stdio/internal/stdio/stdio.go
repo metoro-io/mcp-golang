@@ -102,7 +102,7 @@ func (rb *ReadBuffer) ReadMessage() (*transport.BaseJsonRpcMessage, error) {
 		if rb.buffer[i] == '\n' {
 			// Extract line
 			line := string(rb.buffer[:i])
-			println("read line: ", line)
+			//println("read line: ", line)
 			rb.buffer = rb.buffer[i+1:]
 			return deserializeMessage(line)
 		}
@@ -131,16 +131,22 @@ func deserializeMessage(line string) (*transport.BaseJsonRpcMessage, error) {
 	var notification transport.BaseJSONRPCNotification
 	if err := json.Unmarshal([]byte(line), &notification); err == nil {
 		return transport.NewBaseMessageNotification(&notification), nil
+	} else {
+		//println("unmarshaled notification error:", err.Error())
 	}
 
 	var response transport.BaseJSONRPCResponse
 	if err := json.Unmarshal([]byte(line), &response); err == nil {
 		return transport.NewBaseMessageResponse(&response), nil
+	} else {
+		//println("unmarshaled response error:", err.Error())
 	}
 
 	var errorResponse transport.BaseJSONRPCError
 	if err := json.Unmarshal([]byte(line), &errorResponse); err == nil {
 		return transport.NewBaseMessageError(&errorResponse), nil
+	} else {
+		//println("unmarshaled error response error:", err.Error())
 	}
 
 	// Must be a response

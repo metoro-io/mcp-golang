@@ -72,8 +72,9 @@ func (m *BaseJSONRPCRequest) UnmarshalJSON(data []byte) error {
 		return errors.New("field method in BaseJSONRPCRequest: required")
 	}
 	if required.Params == nil {
-		return errors.New("field params in BaseJSONRPCRequest: required")
+		required.Params = new(json.RawMessage)
 	}
+
 	m.Id = *required.Id
 	m.Jsonrpc = *required.Jsonrpc
 	m.Method = *required.Method

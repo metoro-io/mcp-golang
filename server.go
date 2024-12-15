@@ -94,7 +94,7 @@ func (c promptResponseSent) MarshalJSON() ([]byte, error) {
 		errorText := c.Error.Error()
 		c.Response = NewPromptResponse("error", NewPromptMessage(NewTextContent(errorText), RoleUser))
 	}
-	return json.Marshal(c)
+	return json.Marshal(c.Response)
 }
 
 type Server struct {
