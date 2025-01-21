@@ -89,14 +89,19 @@ func (c *Client) ListTools(ctx context.Context, cursor *string) (*tools.ToolsRes
 }
 
 // CallTool calls a specific tool on the server with the provided arguments
-func (c *Client) CallTool(ctx context.Context, name string, arguments json.RawMessage) (*ToolResponse, error) {
+func (c *Client) CallTool(ctx context.Context, name string, arguments any) (*ToolResponse, error) {
 	if !c.initialized {
 		return nil, errors.New("client not initialized")
 	}
 
+	argumentsJson, err := json.Marshal(arguments)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to marshal arguments")
+	}
+
 	params := baseCallToolRequestParams{
 		Name:      name,
-		Arguments: arguments,
+		Arguments: argumentsJson,
 	}
 
 	response, err := c.protocol.Request(ctx, "tools/call", params, nil)
@@ -148,14 +153,19 @@ func (c *Client) ListPrompts(ctx context.Context, cursor *string) (*ListPromptsR
 }
 
 // GetPrompt retrieves a specific prompt from the server
-func (c *Client) GetPrompt(ctx context.Context, name string, arguments json.RawMessage) (*PromptResponse, error) {
+func (c *Client) GetPrompt(ctx context.Context, name string, arguments any) (*PromptResponse, error) {
 	if !c.initialized {
 		return nil, errors.New("client not initialized")
 	}
 
+	argumentsJson, err := json.Marshal(arguments)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to marshal arguments")
+	}
+
 	params := baseGetPromptRequestParamsArguments{
 		Name:      name,
-		Arguments: arguments,
+		Arguments: argumentsJson,
 	}
 
 	response, err := c.protocol.Request(ctx, "prompts/get", params, nil)
