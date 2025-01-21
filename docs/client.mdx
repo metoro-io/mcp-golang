@@ -56,13 +56,21 @@ for _, tool := range tools.Tools {
 ### Calling a Tool
 
 ```go
-// Example: Calling a tool with arguments
-args := map[string]interface{}{
-    "param1": "value1",
-    "param2": 42,
+// Define a type-safe struct for your tool arguments
+type CalculateArgs struct {
+    Operation string `json:"operation"`
+    A         int    `json:"a"`
+    B         int    `json:"b"`
 }
 
-response, err := client.CallTool(context.Background(), "tool_name", args)
+// Create typed arguments
+args := CalculateArgs{
+    Operation: "add",
+    A:         10,
+    B:         5,
+}
+
+response, err := client.CallTool(context.Background(), "calculate", args)
 if err != nil {
     log.Printf("Failed to call tool: %v", err)
 }
@@ -93,8 +101,14 @@ for _, prompt := range prompts.Prompts {
 ### Using a Prompt
 
 ```go
-args := map[string]interface{}{
-    "input": "Hello, MCP!",
+// Define a type-safe struct for your prompt arguments
+type PromptArgs struct {
+    Input string `json:"input"`
+}
+
+// Create typed arguments
+args := PromptArgs{
+    Input: "Hello, MCP!",
 }
 
 response, err := client.GetPrompt(context.Background(), "prompt_name", args)
@@ -161,7 +175,7 @@ for {
 The client includes comprehensive error handling. All methods return an error as their second return value:
 
 ```go
-response, err := client.CallTool(context.Background(), "tool_name", args)
+response, err := client.CallTool(context.Background(), "calculate", args)
 if err != nil {
     switch {
     case errors.Is(err, mcp.ErrClientNotInitialized):
@@ -178,7 +192,8 @@ if err != nil {
 2. Use appropriate context management for timeouts and cancellation
 3. Handle errors appropriately for your use case
 4. Close or clean up resources when done
-5. Use type-safe arguments when possible instead of raw maps
+5. Define type-safe structs for tool and prompt arguments
+6. Use struct tags to ensure correct JSON field names
 
 ## Complete Example
 
