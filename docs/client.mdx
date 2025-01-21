@@ -1,0 +1,185 @@
+---
+title: 'Using the MCP Client'
+description: 'Learn how to use the MCP client to interact with MCP servers'
+---
+
+# MCP Client Usage Guide
+
+The MCP client provides a simple and intuitive way to interact with MCP servers. This guide will walk you through initializing the client, connecting to a server, and using various MCP features.
+
+## Installation
+
+Add the MCP Golang package to your project:
+
+```bash
+go get github.com/metoro-io/mcp-golang
+```
+
+## Basic Usage
+
+Here's a simple example of creating and initializing an MCP client:
+
+```go
+import (
+    mcp "github.com/metoro-io/mcp-golang"
+    "github.com/metoro-io/mcp-golang/transport/stdio"
+)
+
+// Create a transport (stdio in this example)
+transport := stdio.NewStdioServerTransportWithIO(stdout, stdin)
+
+// Create a new client
+client := mcp.NewClient(transport)
+
+// Initialize the client
+response, err := client.Initialize(context.Background())
+if err != nil {
+    log.Fatalf("Failed to initialize client: %v", err)
+}
+```
+
+## Working with Tools
+
+### Listing Available Tools
+
+```go
+tools, err := client.ListTools(context.Background(), nil)
+if err != nil {
+    log.Fatalf("Failed to list tools: %v", err)
+}
+
+for _, tool := range tools.Tools {
+    log.Printf("Tool: %s. Description: %s", tool.Name, *tool.Description)
+}
+```
+
+### Calling a Tool
+
+```go
+// Example: Calling a tool with arguments
+args := map[string]interface{}{
+    "param1": "value1",
+    "param2": 42,
+}
+
+response, err := client.CallTool(context.Background(), "tool_name", args)
+if err != nil {
+    log.Printf("Failed to call tool: %v", err)
+}
+
+// Handle the response
+if response != nil && len(response.Content) > 0 {
+    if response.Content[0].TextContent != nil {
+        log.Printf("Response: %s", response.Content[0].TextContent.Text)
+    }
+}
+```
+
+## Working with Prompts
+
+### Listing Available Prompts
+
+```go
+prompts, err := client.ListPrompts(context.Background(), nil)
+if err != nil {
+    log.Printf("Failed to list prompts: %v", err)
+}
+
+for _, prompt := range prompts.Prompts {
+    log.Printf("Prompt: %s. Description: %s", prompt.Name, *prompt.Description)
+}
+```
+
+### Using a Prompt
+
+```go
+args := map[string]interface{}{
+    "input": "Hello, MCP!",
+}
+
+response, err := client.GetPrompt(context.Background(), "prompt_name", args)
+if err != nil {
+    log.Printf("Failed to get prompt: %v", err)
+}
+
+if response != nil && len(response.Messages) > 0 {
+    log.Printf("Response: %s", response.Messages[0].Content.TextContent.Text)
+}
+```
+
+## Working with Resources
+
+### Listing Resources
+
+```go
+resources, err := client.ListResources(context.Background(), nil)
+if err != nil {
+    log.Printf("Failed to list resources: %v", err)
+}
+
+for _, resource := range resources.Resources {
+    log.Printf("Resource: %s", resource.Uri)
+}
+```
+
+### Reading a Resource
+
+```go
+resource, err := client.ReadResource(context.Background(), "resource_uri")
+if err != nil {
+    log.Printf("Failed to read resource: %v", err)
+}
+
+if resource != nil {
+    log.Printf("Resource content: %s", resource.Content)
+}
+```
+
+## Pagination
+
+Both `ListTools` and `ListPrompts` support pagination. You can pass a cursor to get the next page of results:
+
+```go
+var cursor *string
+for {
+    tools, err := client.ListTools(context.Background(), cursor)
+    if err != nil {
+        log.Fatalf("Failed to list tools: %v", err)
+    }
+
+    // Process tools...
+
+    if tools.NextCursor == nil {
+        break // No more pages
+    }
+    cursor = tools.NextCursor
+}
+```
+
+## Error Handling
+
+The client includes comprehensive error handling. All methods return an error as their second return value:
+
+```go
+response, err := client.CallTool(context.Background(), "tool_name", args)
+if err != nil {
+    switch {
+    case errors.Is(err, mcp.ErrClientNotInitialized):
+        // Handle initialization error
+    default:
+        // Handle other errors
+    }
+}
+```
+
+## Best Practices
+
+1. Always initialize the client before making any calls
+2. Use appropriate context management for timeouts and cancellation
+3. Handle errors appropriately for your use case
+4. Close or clean up resources when done
+5. Use type-safe arguments when possible instead of raw maps
+
+## Complete Example
+
+For a complete working example, check out our [example client implementation](https://github.com/metoro-io/mcp-golang/tree/main/examples/client). 
