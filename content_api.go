@@ -3,6 +3,7 @@ package mcp_golang
 import (
 	"encoding/json"
 	"fmt"
+
 	"github.com/tidwall/sjson"
 )
 
@@ -113,7 +114,7 @@ type Content struct {
 
 // Custom JSON marshaling for ToolResponse Content
 func (c Content) MarshalJSON() ([]byte, error) {
-	rawJson := []byte{}
+	var rawJson []byte
 
 	switch c.Type {
 	case ContentTypeText:

@@ -4,15 +4,16 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"reflect"
+	"sort"
+	"strings"
+
 	"github.com/invopop/jsonschema"
 	"github.com/metoro-io/mcp-golang/internal/datastructures"
 	"github.com/metoro-io/mcp-golang/internal/protocol"
 	"github.com/metoro-io/mcp-golang/internal/tools"
 	"github.com/metoro-io/mcp-golang/transport"
 	"github.com/pkg/errors"
-	"reflect"
-	"sort"
-	"strings"
 )
 
 // Here we define the actual MCP server that users will create and run
@@ -476,7 +477,7 @@ func createWrappedToolHandler(userHandler any) func(baseCallToolRequestParams) *
 }
 
 func (s *Server) Serve() error {
-	if s.isRunning == true {
+	if s.isRunning {
 		return fmt.Errorf("server is already running")
 	}
 	pr := s.protocol
