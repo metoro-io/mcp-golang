@@ -117,10 +117,9 @@ func main() {
 		promptArgs := map[string]interface{}{
 			"input": "Hello, Model Context Protocol!",
 		}
-		promptArgsJson, _ := json.Marshal(promptArgs)
 
 		log.Printf("\nCalling uppercase prompt:")
-		upperResponse, err := client.GetPrompt(context.Background(), "uppercase", promptArgsJson)
+		upperResponse, err := client.GetPrompt(context.Background(), "uppercase", promptArgs)
 		if err != nil {
 			log.Printf("Failed to get uppercase prompt: %v", err)
 		} else if upperResponse != nil && len(upperResponse.Messages) > 0 && upperResponse.Messages[0].Content != nil {
@@ -129,7 +128,7 @@ func main() {
 
 		// Example of using the reverse prompt
 		log.Printf("\nCalling reverse prompt:")
-		reverseResponse, err := client.GetPrompt(context.Background(), "reverse", promptArgsJson)
+		reverseResponse, err := client.GetPrompt(context.Background(), "reverse", promptArgs)
 		if err != nil {
 			log.Printf("Failed to get reverse prompt: %v", err)
 		} else if reverseResponse != nil && len(reverseResponse.Messages) > 0 && reverseResponse.Messages[0].Content != nil {
