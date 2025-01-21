@@ -1,7 +1,6 @@
 package main
 
 import (
-	"encoding/json"
 	"log"
 	"os/exec"
 
@@ -10,11 +9,6 @@ import (
 	mcp_golang "github.com/metoro-io/mcp-golang"
 	"github.com/metoro-io/mcp-golang/transport/stdio"
 )
-
-type toolResponseSent struct {
-	Content []*mcp_golang.Content `json:"content"`
-	IsError bool                  `json:"isError"`
-}
 
 func main() {
 	// Start the server process
@@ -59,10 +53,9 @@ func main() {
 	helloArgs := map[string]interface{}{
 		"name": "World",
 	}
-	helloArgsJson, _ := json.Marshal(helloArgs)
 
 	log.Println("\nCalling hello tool:")
-	helloResponse, err := client.CallTool(context.Background(), "hello", helloArgsJson)
+	helloResponse, err := client.CallTool(context.Background(), "hello", helloArgs)
 	if err != nil {
 		log.Printf("Failed to call hello tool: %v", err)
 	} else if helloResponse != nil && len(helloResponse.Content) > 0 && helloResponse.Content[0].TextContent != nil {
@@ -75,10 +68,9 @@ func main() {
 		"a":         10,
 		"b":         5,
 	}
-	calcArgsJson, _ := json.Marshal(calcArgs)
 
 	log.Println("\nCalling calculate tool:")
-	calcResponse, err := client.CallTool(context.Background(), "calculate", calcArgsJson)
+	calcResponse, err := client.CallTool(context.Background(), "calculate", calcArgs)
 	if err != nil {
 		log.Printf("Failed to call calculate tool: %v", err)
 	} else if calcResponse != nil && len(calcResponse.Content) > 0 && calcResponse.Content[0].TextContent != nil {
@@ -89,10 +81,9 @@ func main() {
 	timeArgs := map[string]interface{}{
 		"format": "2006-01-02 15:04:05",
 	}
-	timeArgsJson, _ := json.Marshal(timeArgs)
 
 	log.Println("\nCalling time tool:")
-	timeResponse, err := client.CallTool(context.Background(), "time", timeArgsJson)
+	timeResponse, err := client.CallTool(context.Background(), "time", timeArgs)
 	if err != nil {
 		log.Printf("Failed to call time tool: %v", err)
 	} else if timeResponse != nil && len(timeResponse.Content) > 0 && timeResponse.Content[0].TextContent != nil {
