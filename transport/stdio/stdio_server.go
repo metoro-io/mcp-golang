@@ -5,11 +5,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/metoro-io/mcp-golang/transport"
-	"github.com/metoro-io/mcp-golang/transport/stdio/internal/stdio"
 	"io"
 	"os"
 	"sync"
+
+	"github.com/metoro-io/mcp-golang/transport"
+	"github.com/metoro-io/mcp-golang/transport/stdio/internal/stdio"
 )
 
 // StdioServerTransport implements server-side transport for stdio communication

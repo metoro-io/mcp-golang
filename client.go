@@ -43,7 +43,7 @@ func (c *Client) Initialize(ctx context.Context) error {
 		return errors.Wrap(err, "failed to initialize")
 	}
 
-	responseBytes, ok := response.([]byte)
+	responseBytes, ok := response.(json.RawMessage)
 	if !ok {
 		return errors.New("invalid response type")
 	}
@@ -74,7 +74,7 @@ func (c *Client) ListTools(ctx context.Context, cursor *string) (*tools.ToolsRes
 		return nil, errors.Wrap(err, "failed to list tools")
 	}
 
-	responseBytes, ok := response.([]byte)
+	responseBytes, ok := response.(json.RawMessage)
 	if !ok {
 		return nil, errors.New("invalid response type")
 	}
@@ -104,7 +104,7 @@ func (c *Client) CallTool(ctx context.Context, name string, arguments json.RawMe
 		return nil, errors.Wrap(err, "failed to call tool")
 	}
 
-	responseBytes, ok := response.([]byte)
+	responseBytes, ok := response.(json.RawMessage)
 	if !ok {
 		return nil, errors.New("invalid response type")
 	}
@@ -137,7 +137,7 @@ func (c *Client) ListPrompts(ctx context.Context, cursor *string) (*listPromptsR
 		return nil, errors.Wrap(err, "failed to list prompts")
 	}
 
-	responseBytes, ok := response.([]byte)
+	responseBytes, ok := response.(json.RawMessage)
 	if !ok {
 		return nil, errors.New("invalid response type")
 	}
@@ -167,7 +167,7 @@ func (c *Client) GetPrompt(ctx context.Context, name string, arguments json.RawM
 		return nil, errors.Wrap(err, "failed to get prompt")
 	}
 
-	responseBytes, ok := response.([]byte)
+	responseBytes, ok := response.(json.RawMessage)
 	if !ok {
 		return nil, errors.New("invalid response type")
 	}
@@ -200,7 +200,7 @@ func (c *Client) ListResources(ctx context.Context, cursor *string) (*listResour
 		return nil, errors.Wrap(err, "failed to list resources")
 	}
 
-	responseBytes, ok := response.([]byte)
+	responseBytes, ok := response.(json.RawMessage)
 	if !ok {
 		return nil, errors.New("invalid response type")
 	}
@@ -229,7 +229,7 @@ func (c *Client) ReadResource(ctx context.Context, uri string) (*ResourceRespons
 		return nil, errors.Wrap(err, "failed to read resource")
 	}
 
-	responseBytes, ok := response.([]byte)
+	responseBytes, ok := response.(json.RawMessage)
 	if !ok {
 		return nil, errors.New("invalid response type")
 	}
