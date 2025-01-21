@@ -8,37 +8,37 @@ import (
 // Capabilities that a server may support. Known capabilities are defined here, in
 // this schema, but this is not a closed set: any server can define its own,
 // additional capabilities.
-type serverCapabilities struct {
+type ServerCapabilities struct {
 	// Experimental, non-standard capabilities that the server supports.
-	Experimental serverCapabilitiesExperimental `json:"experimental,omitempty" yaml:"experimental,omitempty" mapstructure:"experimental,omitempty"`
+	Experimental ServerCapabilitiesExperimental `json:"experimental,omitempty" yaml:"experimental,omitempty" mapstructure:"experimental,omitempty"`
 
 	// Present if the server supports sending log messages to the client.
-	Logging serverCapabilitiesLogging `json:"logging,omitempty" yaml:"logging,omitempty" mapstructure:"logging,omitempty"`
+	Logging ServerCapabilitiesLogging `json:"logging,omitempty" yaml:"logging,omitempty" mapstructure:"logging,omitempty"`
 
 	// Present if the server offers any prompt templates.
-	Prompts *serverCapabilitiesPrompts `json:"prompts,omitempty" yaml:"prompts,omitempty" mapstructure:"prompts,omitempty"`
+	Prompts *ServerCapabilitiesPrompts `json:"prompts,omitempty" yaml:"prompts,omitempty" mapstructure:"prompts,omitempty"`
 
 	// Present if the server offers any resources to read.
-	Resources *serverCapabilitiesResources `json:"resources,omitempty" yaml:"resources,omitempty" mapstructure:"resources,omitempty"`
+	Resources *ServerCapabilitiesResources `json:"resources,omitempty" yaml:"resources,omitempty" mapstructure:"resources,omitempty"`
 
 	// Present if the server offers any tools to call.
-	Tools *serverCapabilitiesTools `json:"tools,omitempty" yaml:"tools,omitempty" mapstructure:"tools,omitempty"`
+	Tools *ServerCapabilitiesTools `json:"tools,omitempty" yaml:"tools,omitempty" mapstructure:"tools,omitempty"`
 }
 
 // Experimental, non-standard capabilities that the server supports.
-type serverCapabilitiesExperimental map[string]map[string]interface{}
+type ServerCapabilitiesExperimental map[string]map[string]interface{}
 
 // Present if the server supports sending log messages to the client.
-type serverCapabilitiesLogging map[string]interface{}
+type ServerCapabilitiesLogging map[string]interface{}
 
 // Present if the server offers any prompt templates.
-type serverCapabilitiesPrompts struct {
+type ServerCapabilitiesPrompts struct {
 	// Whether this server supports notifications for changes to the prompt list.
 	ListChanged *bool `json:"listChanged,omitempty" yaml:"listChanged,omitempty" mapstructure:"listChanged,omitempty"`
 }
 
 // Present if the server offers any resources to read.
-type serverCapabilitiesResources struct {
+type ServerCapabilitiesResources struct {
 	// Whether this server supports notifications for changes to the resource list.
 	ListChanged *bool `json:"listChanged,omitempty" yaml:"listChanged,omitempty" mapstructure:"listChanged,omitempty"`
 
@@ -47,20 +47,20 @@ type serverCapabilitiesResources struct {
 }
 
 // Present if the server offers any tools to call.
-type serverCapabilitiesTools struct {
+type ServerCapabilitiesTools struct {
 	// Whether this server supports notifications for changes to the tool list.
 	ListChanged *bool `json:"listChanged,omitempty" yaml:"listChanged,omitempty" mapstructure:"listChanged,omitempty"`
 }
 
 // After receiving an initialize request from the client, the server sends this
 // response.
-type initializeResult struct {
+type InitializeResponse struct {
 	// This result property is reserved by the protocol to allow clients and servers
 	// to attach additional metadata to their responses.
 	Meta initializeResultMeta `json:"_meta,omitempty" yaml:"_meta,omitempty" mapstructure:"_meta,omitempty"`
 
 	// Capabilities corresponds to the JSON schema field "capabilities".
-	Capabilities serverCapabilities `json:"capabilities" yaml:"capabilities" mapstructure:"capabilities"`
+	Capabilities ServerCapabilities `json:"capabilities" yaml:"capabilities" mapstructure:"capabilities"`
 
 	// Instructions describing how to use the server and its features.
 	//
@@ -83,7 +83,7 @@ type initializeResult struct {
 type initializeResultMeta map[string]interface{}
 
 // UnmarshalJSON implements json.Unmarshaler.
-func (j *initializeResult) UnmarshalJSON(b []byte) error {
+func (j *InitializeResponse) UnmarshalJSON(b []byte) error {
 	var raw map[string]interface{}
 	if err := json.Unmarshal(b, &raw); err != nil {
 		return err
@@ -97,12 +97,12 @@ func (j *initializeResult) UnmarshalJSON(b []byte) error {
 	if _, ok := raw["serverInfo"]; raw != nil && !ok {
 		return fmt.Errorf("field serverInfo in initializeResult: required")
 	}
-	type Plain initializeResult
+	type Plain InitializeResponse
 	var plain Plain
 	if err := json.Unmarshal(b, &plain); err != nil {
 		return err
 	}
-	*j = initializeResult(plain)
+	*j = InitializeResponse(plain)
 	return nil
 }
 

@@ -318,7 +318,7 @@ func TestHandleListPromptsPagination(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	promptsResp, ok := resp.(listPromptsResult)
+	promptsResp, ok := resp.(ListPromptsResponse)
 	if !ok {
 		t.Fatal("Expected listPromptsResult")
 	}
@@ -342,7 +342,7 @@ func TestHandleListPromptsPagination(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	promptsResp, ok = resp.(listPromptsResult)
+	promptsResp, ok = resp.(ListPromptsResponse)
 	if !ok {
 		t.Fatal("Expected listPromptsResult")
 	}
@@ -366,7 +366,7 @@ func TestHandleListPromptsPagination(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	promptsResp, ok = resp.(listPromptsResult)
+	promptsResp, ok = resp.(ListPromptsResponse)
 	if !ok {
 		t.Fatal("Expected listPromptsResult")
 	}
@@ -399,7 +399,7 @@ func TestHandleListPromptsPagination(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	promptsResp, ok = resp.(listPromptsResult)
+	promptsResp, ok = resp.(ListPromptsResponse)
 	if !ok {
 		t.Fatal("Expected listPromptsResult")
 	}
@@ -443,7 +443,7 @@ func TestHandleListResourcesPagination(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	resourcesResp, ok := resp.(listResourcesResult)
+	resourcesResp, ok := resp.(ListResourcesResponse)
 	if !ok {
 		t.Fatal("Expected listResourcesResult")
 	}
@@ -467,7 +467,7 @@ func TestHandleListResourcesPagination(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	resourcesResp, ok = resp.(listResourcesResult)
+	resourcesResp, ok = resp.(ListResourcesResponse)
 	if !ok {
 		t.Fatal("Expected listResourcesResult")
 	}
@@ -491,7 +491,7 @@ func TestHandleListResourcesPagination(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	resourcesResp, ok = resp.(listResourcesResult)
+	resourcesResp, ok = resp.(ListResourcesResponse)
 	if !ok {
 		t.Fatal("Expected listResourcesResult")
 	}
@@ -524,7 +524,7 @@ func TestHandleListResourcesPagination(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	resourcesResp, ok = resp.(listResourcesResult)
+	resourcesResp, ok = resp.(ListResourcesResponse)
 	if !ok {
 		t.Fatal("Expected listResourcesResult")
 	}

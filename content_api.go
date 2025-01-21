@@ -112,6 +112,40 @@ type Content struct {
 	Annotations      *Annotations
 }
 
+func (c *Content) UnmarshalJSON(b []byte) error {
+	type typeWrapper struct {
+		Type             ContentType       `json:"type" yaml:"type" mapstructure:"type"`
+		Text             *string           `json:"text" yaml:"text" mapstructure:"text"`
+		Image            *string           `json:"image" yaml:"image" mapstructure:"image"`
+		Annotations      *Annotations      `json:"annotations" yaml:"annotations" mapstructure:"annotations"`
+		EmbeddedResource *EmbeddedResource `json:"resource" yaml:"resource" mapstructure:"resource"`
+	}
+	var tw typeWrapper
+	err := json.Unmarshal(b, &tw)
+	if err != nil {
+		return err
+	}
+	switch tw.Type {
+	case ContentTypeText:
+		c.Type = ContentTypeText
+	case ContentTypeImage:
+		c.Type = ContentTypeImage
+	case ContentTypeEmbeddedResource:
+		c.Type = ContentTypeEmbeddedResource
+	default:
+		return fmt.Errorf("unknown content type: %s", tw.Type)
+	}
+
+	switch c.Type {
+	case ContentTypeText:
+		c.TextContent = &TextContent{Text: *tw.Text}
+	default:
+		return fmt.Errorf("unknown content type: %s", c.Type)
+	}
+
+	return nil
+}
+
 // Custom JSON marshaling for ToolResponse Content
 func (c Content) MarshalJSON() ([]byte, error) {
 	var rawJson []byte

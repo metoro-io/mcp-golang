@@ -14,7 +14,7 @@ import (
 type Client struct {
 	transport    transport.Transport
 	protocol     *protocol.Protocol
-	capabilities *serverCapabilities
+	capabilities *ServerCapabilities
 	initialized  bool
 }
 
@@ -27,36 +27,36 @@ func NewClient(transport transport.Transport) *Client {
 }
 
 // Initialize connects to the server and retrieves its capabilities
-func (c *Client) Initialize(ctx context.Context) error {
+func (c *Client) Initialize(ctx context.Context) (*InitializeResponse, error) {
 	if c.initialized {
-		return errors.New("client already initialized")
+		return nil, errors.New("client already initialized")
 	}
 
 	err := c.protocol.Connect(c.transport)
 	if err != nil {
-		return errors.Wrap(err, "failed to connect transport")
+		return nil, errors.Wrap(err, "failed to connect transport")
 	}
 
 	// Make initialize request to server
 	response, err := c.protocol.Request(ctx, "initialize", nil, nil)
 	if err != nil {
-		return errors.Wrap(err, "failed to initialize")
+		return nil, errors.Wrap(err, "failed to initialize")
 	}
 
 	responseBytes, ok := response.(json.RawMessage)
 	if !ok {
-		return errors.New("invalid response type")
+		return nil, errors.New("invalid response type")
 	}
 
-	var initResult initializeResult
+	var initResult InitializeResponse
 	err = json.Unmarshal(responseBytes, &initResult)
 	if err != nil {
-		return errors.Wrap(err, "failed to unmarshal initialize response")
+		return nil, errors.Wrap(err, "failed to unmarshal initialize response")
 	}
 
 	c.capabilities = &initResult.Capabilities
 	c.initialized = true
-	return nil
+	return &initResult, nil
 }
 
 // ListTools retrieves the list of available tools from the server
@@ -109,21 +109,17 @@ func (c *Client) CallTool(ctx context.Context, name string, arguments json.RawMe
 		return nil, errors.New("invalid response type")
 	}
 
-	var toolResponse toolResponseSent
+	var toolResponse ToolResponse
 	err = json.Unmarshal(responseBytes, &toolResponse)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to unmarshal tool response")
 	}
 
-	if toolResponse.Error != nil {
-		return nil, toolResponse.Error
-	}
-
-	return toolResponse.Response, nil
+	return &toolResponse, nil
 }
 
 // ListPrompts retrieves the list of available prompts from the server
-func (c *Client) ListPrompts(ctx context.Context, cursor *string) (*listPromptsResult, error) {
+func (c *Client) ListPrompts(ctx context.Context, cursor *string) (*ListPromptsResponse, error) {
 	if !c.initialized {
 		return nil, errors.New("client not initialized")
 	}
@@ -142,7 +138,7 @@ func (c *Client) ListPrompts(ctx context.Context, cursor *string) (*listPromptsR
 		return nil, errors.New("invalid response type")
 	}
 
-	var promptsResponse listPromptsResult
+	var promptsResponse ListPromptsResponse
 	err = json.Unmarshal(responseBytes, &promptsResponse)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to unmarshal prompts response")
@@ -172,21 +168,17 @@ func (c *Client) GetPrompt(ctx context.Context, name string, arguments json.RawM
 		return nil, errors.New("invalid response type")
 	}
 
-	var promptResponse promptResponseSent
+	var promptResponse PromptResponse
 	err = json.Unmarshal(responseBytes, &promptResponse)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to unmarshal prompt response")
 	}
 
-	if promptResponse.Error != nil {
-		return nil, promptResponse.Error
-	}
-
-	return promptResponse.Response, nil
+	return &promptResponse, nil
 }
 
 // ListResources retrieves the list of available resources from the server
-func (c *Client) ListResources(ctx context.Context, cursor *string) (*listResourcesResult, error) {
+func (c *Client) ListResources(ctx context.Context, cursor *string) (*ListResourcesResponse, error) {
 	if !c.initialized {
 		return nil, errors.New("client not initialized")
 	}
@@ -205,7 +197,7 @@ func (c *Client) ListResources(ctx context.Context, cursor *string) (*listResour
 		return nil, errors.New("invalid response type")
 	}
 
-	var resourcesResponse listResourcesResult
+	var resourcesResponse ListResourcesResponse
 	err = json.Unmarshal(responseBytes, &resourcesResponse)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to unmarshal resources response")
@@ -262,6 +254,6 @@ func (c *Client) Ping(ctx context.Context) error {
 }
 
 // GetCapabilities returns the server capabilities obtained during initialization
-func (c *Client) GetCapabilities() *serverCapabilities {
+func (c *Client) GetCapabilities() *ServerCapabilities {
 	return c.capabilities
 }

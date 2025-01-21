@@ -7,15 +7,15 @@ type readResourceRequestParams struct {
 }
 
 // The server's response to a resources/list request from the client.
-type listResourcesResult struct {
+type ListResourcesResponse struct {
 	// Resources corresponds to the JSON schema field "resources".
-	Resources []*resourceSchema `json:"resources" yaml:"resources" mapstructure:"resources"`
+	Resources []*ResourceSchema `json:"resources" yaml:"resources" mapstructure:"resources"`
 	// NextCursor is a cursor for pagination. If not nil, there are more resources available.
 	NextCursor *string `json:"nextCursor,omitempty" yaml:"nextCursor,omitempty" mapstructure:"nextCursor,omitempty"`
 }
 
 // A known resource that the server is capable of reading.
-type resourceSchema struct {
+type ResourceSchema struct {
 	// Annotations corresponds to the JSON schema field "annotations".
 	Annotations *Annotations `json:"annotations,omitempty" yaml:"annotations,omitempty" mapstructure:"annotations,omitempty"`
 

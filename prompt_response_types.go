@@ -11,17 +11,17 @@ type baseGetPromptRequestParamsArguments struct {
 }
 
 // The server's response to a prompts/list request from the client.
-type listPromptsResult struct {
+type ListPromptsResponse struct {
 	// Prompts corresponds to the JSON schema field "prompts".
-	Prompts []*promptSchema `json:"prompts" yaml:"prompts" mapstructure:"prompts"`
+	Prompts []*PromptSchema `json:"prompts" yaml:"prompts" mapstructure:"prompts"`
 	// NextCursor is a cursor for pagination. If not nil, there are more prompts available.
 	NextCursor *string `json:"nextCursor,omitempty" yaml:"nextCursor,omitempty" mapstructure:"nextCursor,omitempty"`
 }
 
-// A promptSchema or prompt template that the server offers.
-type promptSchema struct {
+// A PromptSchema or prompt template that the server offers.
+type PromptSchema struct {
 	// A list of arguments to use for templating the prompt.
-	Arguments []promptSchemaArgument `json:"arguments,omitempty" yaml:"arguments,omitempty" mapstructure:"arguments,omitempty"`
+	Arguments []PromptSchemaArgument `json:"arguments,omitempty" yaml:"arguments,omitempty" mapstructure:"arguments,omitempty"`
 
 	// An optional description of what this prompt provides
 	Description *string `json:"description,omitempty" yaml:"description,omitempty" mapstructure:"description,omitempty"`
@@ -30,7 +30,7 @@ type promptSchema struct {
 	Name string `json:"name" yaml:"name" mapstructure:"name"`
 }
 
-type promptSchemaArgument struct {
+type PromptSchemaArgument struct {
 	// A human-readable description of the argument.
 	Description *string `json:"description,omitempty" yaml:"description,omitempty" mapstructure:"description,omitempty"`
 
