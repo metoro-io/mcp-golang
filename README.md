@@ -24,7 +24,7 @@
 
 mcp-golang is an unofficial implementation of the [Model Context Protocol](https://modelcontextprotocol.io/) in Go.
 
-Write MCP servers in golang with a few lines of code.
+Write MCP servers and clients in golang with a few lines of code.
 
 Docs at [https://mcpgolang.com](https://mcpgolang.com)
 
@@ -32,11 +32,14 @@ Docs at [https://mcpgolang.com](https://mcpgolang.com)
 - 🛡️**Type safety** - Define your tool arguments as native go structs, have mcp-golang handle the rest. Automatic schema generation, deserialization, error handling etc.
 - 🚛 **Custom transports** - Use the built-in transports or write your own.
 - ⚡ **Low boilerplate** - mcp-golang generates all the MCP endpoints for you apart from your tools, prompts and resources.
-- 🧩 **Modular** - The library is split into three components: transport, protocol and server. Use them all or take what you need.
+- 🧩 **Modular** - The library is split into three components: transport, protocol and server/client. Use them all or take what you need.
+- 🔄 **Bi-directional** - Full support for both server and client implementations.
 
 ## Example Usage
 
 Install with `go get github.com/metoro-io/mcp-golang`
+
+### Server Example
 
 ```go
 package main
@@ -87,10 +90,69 @@ func main() {
 
 	<-done
 }
-
 ```
 
-This will start a server using the stdio transport (used by claude desktop), host a tool called "hello" that will say hello to the user who submitted it.
+### Client Example
+
+Checkout the [examples/client](./examples/client) directory for a more complete example.
+
+```go
+package main
+
+import (
+    "context"
+    "log"
+    mcp "github.com/metoro-io/mcp-golang"
+    "github.com/metoro-io/mcp-golang/transport/stdio"
+)
+
+// Define type-safe arguments
+type CalculateArgs struct {
+    Operation string `json:"operation"`
+    A         int    `json:"a"`
+    B         int    `json:"b"`
+}
+
+func main() {
+	cmd := exec.Command("go", "run", "./server/main.go")
+	stdin, err := cmd.StdinPipe()
+	if err != nil {
+		log.Fatalf("Failed to get stdin pipe: %v", err)
+	}
+	stdout, err := cmd.StdoutPipe()
+	if err != nil {
+		log.Fatalf("Failed to get stdout pipe: %v", err)
+	}
+
+	if err := cmd.Start(); err != nil {
+		log.Fatalf("Failed to start server: %v", err)
+	}
+	defer cmd.Process.Kill()
+    // Create and initialize client
+    transport := stdio.NewStdioServerTransportWithIO(stdout, stdin)
+    client := mcp.NewClient(transport)
+    
+    if _, err := client.Initialize(context.Background()); err != nil {
+        log.Fatalf("Failed to initialize: %v", err)
+    }
+
+    // Call a tool with typed arguments
+    args := CalculateArgs{
+        Operation: "add",
+        A:         10,
+        B:         5,
+    }
+    
+    response, err := client.CallTool(context.Background(), "calculate", args)
+    if err != nil {
+        log.Fatalf("Failed to call tool: %v", err)
+    }
+    
+    if response != nil && len(response.Content) > 0 {
+        log.Printf("Result: %s", response.Content[0].TextContent.Text)
+    }
+}
+```
 
 ### Using with Claude Desktop
 
@@ -151,3 +213,12 @@ Open a PR to add your own projects!
 - [x] SSE
 - [x] Custom transport support
 - [ ] HTTPS with custom auth support - in progress. Not currently part of the spec but we'll be adding experimental support for it.
+
+### Client
+- [x] Call tools
+- [x] Call prompts
+- [x] Call resources
+- [x] List tools
+- [x] List prompts
+- [x] List resources
+
