@@ -114,20 +114,20 @@ type CalculateArgs struct {
 }
 
 func main() {
-	cmd := exec.Command("go", "run", "./server/main.go")
-	stdin, err := cmd.StdinPipe()
-	if err != nil {
-		log.Fatalf("Failed to get stdin pipe: %v", err)
-	}
-	stdout, err := cmd.StdoutPipe()
-	if err != nil {
-		log.Fatalf("Failed to get stdout pipe: %v", err)
-	}
+ cmd := exec.Command("go", "run", "./server/main.go")
+ stdin, err := cmd.StdinPipe()
+ if err != nil {
+  log.Fatalf("Failed to get stdin pipe: %v", err)
+ }
+ stdout, err := cmd.StdoutPipe()
+ if err != nil {
+  log.Fatalf("Failed to get stdout pipe: %v", err)
+ }
 
-	if err := cmd.Start(); err != nil {
-		log.Fatalf("Failed to start server: %v", err)
-	}
-	defer cmd.Process.Kill()
+ if err := cmd.Start(); err != nil {
+  log.Fatalf("Failed to start server: %v", err)
+ }
+ defer cmd.Process.Kill()
     // Create and initialize client
     transport := stdio.NewStdioServerTransportWithIO(stdout, stdin)
     client := mcp.NewClient(transport)
