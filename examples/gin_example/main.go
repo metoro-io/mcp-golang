@@ -1,6 +1,8 @@
 package main
 
 import (
+	"context"
+	"fmt"
 	"log"
 	"time"
 
@@ -22,7 +24,14 @@ func main() {
 	server := mcp_golang.NewServer(transport, mcp_golang.WithName("mcp-golang-gin-example"), mcp_golang.WithVersion("0.0.1"))
 
 	// Register a simple tool
-	err := server.RegisterTool("time", "Returns the current time in the specified format", func(args TimeArgs) (*mcp_golang.ToolResponse, error) {
+	err := server.RegisterTool("time", "Returns the current time in the specified format", func(ctx context.Context, args TimeArgs) (*mcp_golang.ToolResponse, error) {
+		ginCtx, ok := ctx.Value("ginContext").(*gin.Context)
+		if !ok {
+			return nil, fmt.Errorf("ginContext not found in context")
+		}
+		userAgent := ginCtx.GetHeader("User-Agent")
+		log.Printf("Request from User-Agent: %s", userAgent)
+
 		format := args.Format
 		if format == "" {
 			format = time.RFC3339

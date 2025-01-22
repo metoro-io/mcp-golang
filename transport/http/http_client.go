@@ -16,7 +16,7 @@ import (
 type HTTPClientTransport struct {
 	baseURL        string
 	endpoint       string
-	messageHandler func(message *transport.BaseJsonRpcMessage)
+	messageHandler func(ctx context.Context, message *transport.BaseJsonRpcMessage)
 	errorHandler   func(error)
 	closeHandler   func()
 	mu             sync.RWMutex
@@ -44,7 +44,7 @@ func (t *HTTPClientTransport) Start(ctx context.Context) error {
 }
 
 // Send implements Transport.Send
-func (t *HTTPClientTransport) Send(message *transport.BaseJsonRpcMessage) error {
+func (t *HTTPClientTransport) Send(ctx context.Context, message *transport.BaseJsonRpcMessage) error {
 	jsonData, err := json.Marshal(message)
 	if err != nil {
 		return fmt.Errorf("failed to marshal message: %w", err)
@@ -81,7 +81,7 @@ func (t *HTTPClientTransport) Send(message *transport.BaseJsonRpcMessage) error 
 			t.mu.RUnlock()
 
 			if handler != nil {
-				handler(transport.NewBaseMessageResponse(&response))
+				handler(ctx, transport.NewBaseMessageResponse(&response))
 			}
 			return nil
 		}
@@ -94,7 +94,7 @@ func (t *HTTPClientTransport) Send(message *transport.BaseJsonRpcMessage) error 
 			t.mu.RUnlock()
 
 			if handler != nil {
-				handler(transport.NewBaseMessageError(&errorResponse))
+				handler(ctx, transport.NewBaseMessageError(&errorResponse))
 			}
 			return nil
 		}
@@ -107,7 +107,7 @@ func (t *HTTPClientTransport) Send(message *transport.BaseJsonRpcMessage) error 
 			t.mu.RUnlock()
 
 			if handler != nil {
-				handler(transport.NewBaseMessageNotification(&notification))
+				handler(ctx, transport.NewBaseMessageNotification(&notification))
 			}
 			return nil
 		}
@@ -120,7 +120,7 @@ func (t *HTTPClientTransport) Send(message *transport.BaseJsonRpcMessage) error 
 			t.mu.RUnlock()
 
 			if handler != nil {
-				handler(transport.NewBaseMessageRequest(&request))
+				handler(ctx, transport.NewBaseMessageRequest(&request))
 			}
 			return nil
 		}
@@ -154,7 +154,7 @@ func (t *HTTPClientTransport) SetErrorHandler(handler func(error)) {
 }
 
 // SetMessageHandler implements Transport.SetMessageHandler
-func (t *HTTPClientTransport) SetMessageHandler(handler func(message *transport.BaseJsonRpcMessage)) {
+func (t *HTTPClientTransport) SetMessageHandler(handler func(ctx context.Context, message *transport.BaseJsonRpcMessage)) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	t.messageHandler = handler

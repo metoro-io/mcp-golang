@@ -120,7 +120,7 @@ type Protocol struct {
 	mu               sync.RWMutex
 
 	// Maps method name to request handler
-	requestHandlers map[string]func(*transport.BaseJSONRPCRequest, RequestHandlerExtra) (transport.JsonRpcBody, error) // Result or error
+	requestHandlers map[string]func(context.Context, *transport.BaseJSONRPCRequest, RequestHandlerExtra) (transport.JsonRpcBody, error) // Result or error
 	// Maps request ID to cancellation function
 	requestCancellers map[transport.RequestId]context.CancelFunc
 	// Maps method name to notification handler
@@ -135,7 +135,7 @@ type Protocol struct {
 	// Callback for when an error occurs
 	OnError func(error)
 	// Handler to invoke for any request types that do not have their own handler installed
-	FallbackRequestHandler func(request *transport.BaseJSONRPCRequest) (transport.JsonRpcBody, error)
+	FallbackRequestHandler func(ctx context.Context, request *transport.BaseJSONRPCRequest) (transport.JsonRpcBody, error)
 	// Handler to invoke for any notification types that do not have their own handler installed
 	FallbackNotificationHandler func(notification *transport.BaseJSONRPCNotification) error
 }
@@ -149,7 +149,7 @@ type responseEnvelope struct {
 func NewProtocol(options *ProtocolOptions) *Protocol {
 	p := &Protocol{
 		options:              options,
-		requestHandlers:      make(map[string]func(*transport.BaseJSONRPCRequest, RequestHandlerExtra) (transport.JsonRpcBody, error)),
+		requestHandlers:      make(map[string]func(context.Context, *transport.BaseJSONRPCRequest, RequestHandlerExtra) (transport.JsonRpcBody, error)),
 		requestCancellers:    make(map[transport.RequestId]context.CancelFunc),
 		notificationHandlers: make(map[string]func(*transport.BaseJSONRPCNotification) error),
 		responseHandlers:     make(map[transport.RequestId]chan *responseEnvelope),
@@ -175,10 +175,10 @@ func (p *Protocol) Connect(tr transport.Transport) error {
 		p.handleError(err)
 	})
 
-	tr.SetMessageHandler(func(message *transport.BaseJsonRpcMessage) {
+	tr.SetMessageHandler(func(ctx context.Context, message *transport.BaseJsonRpcMessage) {
 		switch m := message.Type; {
 		case m == transport.BaseMessageTypeJSONRPCRequestType:
-			p.handleRequest(message.JsonRpcRequest)
+			p.handleRequest(ctx, message.JsonRpcRequest)
 		case m == transport.BaseMessageTypeJSONRPCNotificationType:
 			p.handleNotification(message.JsonRpcNotification)
 		case m == transport.BaseMessageTypeJSONRPCResponseType:
@@ -196,7 +196,7 @@ func (p *Protocol) handleClose() {
 	defer p.mu.Unlock()
 
 	// Clear all handlers
-	p.requestHandlers = make(map[string]func(*transport.BaseJSONRPCRequest, RequestHandlerExtra) (transport.JsonRpcBody, error))
+	p.requestHandlers = make(map[string]func(context.Context, *transport.BaseJSONRPCRequest, RequestHandlerExtra) (transport.JsonRpcBody, error))
 	p.notificationHandlers = make(map[string]func(notification *transport.BaseJSONRPCNotification) error)
 
 	// Cancel all pending requests
@@ -244,13 +244,13 @@ func (p *Protocol) handleNotification(notification *transport.BaseJSONRPCNotific
 	}()
 }
 
-func (p *Protocol) handleRequest(request *transport.BaseJSONRPCRequest) {
+func (p *Protocol) handleRequest(ctx context.Context, request *transport.BaseJSONRPCRequest) {
 	p.mu.RLock()
 	handler := p.requestHandlers[request.Method]
 	if handler == nil {
-		handler = func(req *transport.BaseJSONRPCRequest, extra RequestHandlerExtra) (transport.JsonRpcBody, error) {
+		handler = func(ctx context.Context, req *transport.BaseJSONRPCRequest, extra RequestHandlerExtra) (transport.JsonRpcBody, error) {
 			if p.FallbackRequestHandler != nil {
-				return p.FallbackRequestHandler(req)
+				return p.FallbackRequestHandler(ctx, req)
 			}
 			println("no handler for method and no default handler:", req.Method)
 			return nil, fmt.Errorf("method not found: %s", req.Method)
@@ -258,7 +258,7 @@ func (p *Protocol) handleRequest(request *transport.BaseJSONRPCRequest) {
 	}
 	p.mu.RUnlock()
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(ctx)
 	p.mu.Lock()
 	p.requestCancellers[request.Id] = cancel
 	p.mu.Unlock()
@@ -271,7 +271,7 @@ func (p *Protocol) handleRequest(request *transport.BaseJSONRPCRequest) {
 			cancel()
 		}()
 
-		result, err := handler(request, RequestHandlerExtra{Context: ctx})
+		result, err := handler(ctx, request, RequestHandlerExtra{Context: ctx})
 		if err != nil {
 			println("error:", err.Error())
 			p.sendErrorResponse(request.Id, err)
@@ -290,7 +290,7 @@ func (p *Protocol) handleRequest(request *transport.BaseJSONRPCRequest) {
 			Result:  jsonResult,
 		}
 
-		if err := p.transport.Send(transport.NewBaseMessageResponse(response)); err != nil {
+		if err := p.transport.Send(ctx, transport.NewBaseMessageResponse(response)); err != nil {
 			println("error:", err.Error())
 			p.handleError(fmt.Errorf("failed to send response: %w", err))
 		}
@@ -441,7 +441,7 @@ func (p *Protocol) Request(ctx context.Context, method string, params interface{
 		Id:      id,
 	}
 
-	if err := p.transport.Send(transport.NewBaseMessageRequest(request)); err != nil {
+	if err := p.transport.Send(ctx, transport.NewBaseMessageRequest(request)); err != nil {
 		return nil, fmt.Errorf("failed to send request: %w", err)
 	}
 
@@ -474,8 +474,9 @@ func (p *Protocol) sendCancelNotification(requestID transport.RequestId, reason 
 		Method:  "notifications/cancelled",
 		Params:  marshalled,
 	}
+	ctx := context.Background()
 
-	if err := p.transport.Send(transport.NewBaseMessageNotification(notification)); err != nil {
+	if err := p.transport.Send(ctx, transport.NewBaseMessageNotification(notification)); err != nil {
 		p.handleError(fmt.Errorf("failed to send cancel notification: %w", err))
 	}
 	return nil
@@ -490,8 +491,9 @@ func (p *Protocol) sendErrorResponse(requestID transport.RequestId, err error) e
 			Message: err.Error(),
 		},
 	}
+	ctx := context.Background()
 
-	if err := p.transport.Send(transport.NewBaseMessageError(response)); err != nil {
+	if err := p.transport.Send(ctx, transport.NewBaseMessageError(response)); err != nil {
 		p.handleError(fmt.Errorf("failed to send error response: %w", err))
 	}
 	return nil
@@ -513,12 +515,13 @@ func (p *Protocol) Notification(method string, params interface{}) error {
 		Method:  method,
 		Params:  marshalled,
 	}
+	ctx := context.Background()
 
-	return p.transport.Send(transport.NewBaseMessageNotification(notification))
+	return p.transport.Send(ctx, transport.NewBaseMessageNotification(notification))
 }
 
 // SetRequestHandler registers a handler to invoke when this protocol object receives a request with the given method
-func (p *Protocol) SetRequestHandler(method string, handler func(*transport.BaseJSONRPCRequest, RequestHandlerExtra) (transport.JsonRpcBody, error)) {
+func (p *Protocol) SetRequestHandler(method string, handler func(context.Context, *transport.BaseJSONRPCRequest, RequestHandlerExtra) (transport.JsonRpcBody, error)) {
 	p.mu.Lock()
 	p.requestHandlers[method] = handler
 	p.mu.Unlock()

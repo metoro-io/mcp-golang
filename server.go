@@ -1,6 +1,7 @@
 package mcp_golang
 
 import (
+	"context"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
@@ -115,14 +116,14 @@ type Server struct {
 type prompt struct {
 	Name              string
 	Description       string
-	Handler           func(baseGetPromptRequestParamsArguments) *promptResponseSent
+	Handler           func(context.Context, baseGetPromptRequestParamsArguments) *promptResponseSent
 	PromptInputSchema *PromptSchema
 }
 
 type tool struct {
 	Name            string
 	Description     string
-	Handler         func(baseCallToolRequestParams) *toolResponseSent
+	Handler         func(context.Context, baseCallToolRequestParams) *toolResponseSent
 	ToolInputSchema *jsonschema.Schema
 }
 
@@ -131,7 +132,7 @@ type resource struct {
 	Description string
 	Uri         string
 	mimeType    string
-	Handler     func() *resourceResponseSent
+	Handler     func(context.Context) *resourceResponseSent
 }
 
 type ServerOptions func(*Server)
@@ -242,11 +243,18 @@ func (s *Server) DeregisterResource(uri string) error {
 	return s.sendResourceListChangedNotification()
 }
 
-func createWrappedResourceHandler(userHandler any) func() *resourceResponseSent {
+func createWrappedResourceHandler(userHandler any) func(ctx context.Context) *resourceResponseSent {
 	handlerValue := reflect.ValueOf(userHandler)
-	return func() *resourceResponseSent {
+	return func(ctx context.Context) *resourceResponseSent {
+		handlerType := handlerValue.Type()
+		var args []reflect.Value
+		if handlerType.NumIn() == 1 {
+			args = []reflect.Value{reflect.ValueOf(ctx)}
+		} else {
+			args = []reflect.Value{}
+		}
 		// Call the handler with no arguments
-		output := handlerValue.Call([]reflect.Value{})
+		output := handlerValue.Call(args)
 
 		if len(output) != 2 {
 			return newResourceResponseSentError(fmt.Errorf("handler must return exactly two values, got %d", len(output)))
@@ -271,9 +279,15 @@ func createWrappedResourceHandler(userHandler any) func() *resourceResponseSent 
 func validateResourceHandler(handler any) error {
 	handlerValue := reflect.ValueOf(handler)
 	handlerType := handlerValue.Type()
-	if handlerType.NumIn() != 0 {
-		return fmt.Errorf("handler must take no arguments, got %d", handlerType.NumIn())
+	if handlerType.NumIn() != 0 && handlerType.NumIn() != 1 {
+		return fmt.Errorf("handler must take no or one arguments, got %d", handlerType.NumIn())
 	}
+	if handlerType.NumIn() == 1 {
+		if handlerType.In(0) != reflect.TypeOf((*context.Context)(nil)).Elem() {
+			return fmt.Errorf("when a handler has 1 argument, it must be context.Context, got %s", handlerType.In(0).Name())
+		}
+	}
+
 	if handlerType.NumOut() != 2 {
 		return fmt.Errorf("handler must return exactly two values, got %d", handlerType.NumOut())
 	}
@@ -319,11 +333,16 @@ func (s *Server) DeregisterPrompt(name string) error {
 	return s.sendPromptListChangedNotification()
 }
 
-func createWrappedPromptHandler(userHandler any) func(baseGetPromptRequestParamsArguments) *promptResponseSent {
+func createWrappedPromptHandler(userHandler any) func(context.Context, baseGetPromptRequestParamsArguments) *promptResponseSent {
 	handlerValue := reflect.ValueOf(userHandler)
 	handlerType := handlerValue.Type()
-	argumentType := handlerType.In(0)
-	return func(arguments baseGetPromptRequestParamsArguments) *promptResponseSent {
+	var argumentType reflect.Type
+	if handlerType.NumIn() == 2 {
+		argumentType = handlerType.In(1)
+	} else if handlerType.NumIn() == 1 {
+		argumentType = handlerType.In(0)
+	}
+	return func(ctx context.Context, arguments baseGetPromptRequestParamsArguments) *promptResponseSent {
 		// Instantiate a struct of the type of the arguments
 		if !reflect.New(argumentType).CanInterface() {
 			return newPromptResponseSentError(fmt.Errorf("arguments must be a struct"))
@@ -342,7 +361,13 @@ func createWrappedPromptHandler(userHandler any) func(baseGetPromptRequestParams
 			return newPromptResponseSentError(errors.Wrap(err, "arguments must be a struct"))
 		}
 		// Call the handler with the typed arguments
-		output := handlerValue.Call([]reflect.Value{of.Elem()})
+		var args []reflect.Value
+		if handlerType.NumIn() == 2 {
+			args = []reflect.Value{reflect.ValueOf(ctx), of.Elem()}
+		} else {
+			args = []reflect.Value{of.Elem()}
+		}
+		output := handlerValue.Call(args)
 
 		if len(output) != 2 {
 			return newPromptResponseSentError(errors.New(fmt.Sprintf("handler must return exactly two values, got %d", len(output))))
@@ -410,7 +435,18 @@ func createPromptSchemaFromHandler(handler any) *PromptSchema {
 func validatePromptHandler(handler any) error {
 	handlerValue := reflect.ValueOf(handler)
 	handlerType := handlerValue.Type()
-	argumentType := handlerType.In(0)
+
+	var argumentType reflect.Type
+	if handlerType.NumIn() == 2 {
+		if handlerType.In(0) != reflect.TypeOf((*context.Context)(nil)).Elem() {
+			return fmt.Errorf("when a handler has 2 arguments, the first argument must be context.Context, got %s", handlerType.In(0).Name())
+		}
+		argumentType = handlerType.In(1)
+	} else if handlerType.NumIn() == 1 {
+		argumentType = handlerType.In(0)
+	} else {
+		return fmt.Errorf("handler must take one or two arguments, got %d", handlerType.NumIn())
+	}
 
 	if argumentType.Kind() != reflect.Struct {
 		return fmt.Errorf("argument must be a struct")
@@ -436,7 +472,12 @@ func validatePromptHandler(handler any) error {
 func createJsonSchemaFromHandler(handler any) *jsonschema.Schema {
 	handlerValue := reflect.ValueOf(handler)
 	handlerType := handlerValue.Type()
-	argumentType := handlerType.In(0)
+	var argumentType reflect.Type
+	if handlerType.NumIn() == 2 {
+		argumentType = handlerType.In(1)
+	} else if handlerType.NumIn() == 1 {
+		argumentType = handlerType.In(0)
+	}
 	inputSchema := jsonSchemaReflector.ReflectFromType(argumentType)
 	return inputSchema
 }
@@ -444,11 +485,16 @@ func createJsonSchemaFromHandler(handler any) *jsonschema.Schema {
 // This takes a user provided handler and returns a wrapped handler which can be used to actually answer requests
 // Concretely, it will deserialize the arguments and call the user provided handler and then serialize the response
 // If the handler returns an error, it will be serialized and sent back as a tool error rather than a protocol error
-func createWrappedToolHandler(userHandler any) func(baseCallToolRequestParams) *toolResponseSent {
+func createWrappedToolHandler(userHandler any) func(context.Context, baseCallToolRequestParams) *toolResponseSent {
 	handlerValue := reflect.ValueOf(userHandler)
 	handlerType := handlerValue.Type()
-	argumentType := handlerType.In(0)
-	return func(arguments baseCallToolRequestParams) *toolResponseSent {
+	var argumentType reflect.Type
+	if handlerType.NumIn() == 2 {
+		argumentType = handlerType.In(1)
+	} else if handlerType.NumIn() == 1 {
+		argumentType = handlerType.In(0)
+	}
+	return func(ctx context.Context, arguments baseCallToolRequestParams) *toolResponseSent {
 		// Instantiate a struct of the type of the arguments
 		if !reflect.New(argumentType).CanInterface() {
 			return newToolResponseSentError(errors.Wrap(fmt.Errorf("arguments must be a struct"), "failed to create argument struct"))
@@ -466,8 +512,16 @@ func createWrappedToolHandler(userHandler any) func(baseCallToolRequestParams) *
 		if of.Kind() != reflect.Ptr || !of.Elem().CanInterface() {
 			return newToolResponseSentError(errors.Wrap(fmt.Errorf("arguments must be a struct"), "failed to dereference arguments"))
 		}
+
+		var args []reflect.Value
+		if handlerType.NumIn() == 2 {
+			args = []reflect.Value{reflect.ValueOf(ctx), of.Elem()}
+		} else {
+			args = []reflect.Value{of.Elem()}
+		}
+
 		// Call the handler with the typed arguments
-		output := handlerValue.Call([]reflect.Value{of.Elem()})
+		output := handlerValue.Call(args)
 
 		if len(output) != 2 {
 			return newToolResponseSentError(errors.Wrap(fmt.Errorf("handler must return exactly two values, got %d", len(output)), "invalid handler return"))
@@ -510,7 +564,7 @@ func (s *Server) Serve() error {
 	return nil
 }
 
-func (s *Server) handleInitialize(_ *transport.BaseJSONRPCRequest, _ protocol.RequestHandlerExtra) (transport.JsonRpcBody, error) {
+func (s *Server) handleInitialize(ctx context.Context, request *transport.BaseJSONRPCRequest, _ protocol.RequestHandlerExtra) (transport.JsonRpcBody, error) {
 	return InitializeResponse{
 		Meta:            nil,
 		Capabilities:    s.generateCapabilities(),
@@ -523,7 +577,7 @@ func (s *Server) handleInitialize(_ *transport.BaseJSONRPCRequest, _ protocol.Re
 	}, nil
 }
 
-func (s *Server) handleListTools(request *transport.BaseJSONRPCRequest, _ protocol.RequestHandlerExtra) (transport.JsonRpcBody, error) {
+func (s *Server) handleListTools(ctx context.Context, request *transport.BaseJSONRPCRequest, _ protocol.RequestHandlerExtra) (transport.JsonRpcBody, error) {
 	type toolRequestParams struct {
 		Cursor *string `json:"cursor"`
 	}
@@ -598,7 +652,7 @@ func (s *Server) handleListTools(request *transport.BaseJSONRPCRequest, _ protoc
 	}, nil
 }
 
-func (s *Server) handleToolCalls(req *transport.BaseJSONRPCRequest, _ protocol.RequestHandlerExtra) (transport.JsonRpcBody, error) {
+func (s *Server) handleToolCalls(ctx context.Context, req *transport.BaseJSONRPCRequest, _ protocol.RequestHandlerExtra) (transport.JsonRpcBody, error) {
 	params := baseCallToolRequestParams{}
 	// Instantiate a struct of the type of the arguments
 	err := json.Unmarshal(req.Params, &params)
@@ -618,7 +672,7 @@ func (s *Server) handleToolCalls(req *transport.BaseJSONRPCRequest, _ protocol.R
 	if toolToUse == nil {
 		return nil, errors.Wrapf(err, "unknown tool: %s", req.Method)
 	}
-	return toolToUse.Handler(params), nil
+	return toolToUse.Handler(ctx, params), nil
 }
 func (s *Server) generateCapabilities() ServerCapabilities {
 	t := false
@@ -640,7 +694,7 @@ func (s *Server) generateCapabilities() ServerCapabilities {
 		}(),
 	}
 }
-func (s *Server) handleListPrompts(request *transport.BaseJSONRPCRequest, extra protocol.RequestHandlerExtra) (transport.JsonRpcBody, error) {
+func (s *Server) handleListPrompts(ctx context.Context, request *transport.BaseJSONRPCRequest, extra protocol.RequestHandlerExtra) (transport.JsonRpcBody, error) {
 	type promptRequestParams struct {
 		Cursor *string `json:"cursor"`
 	}
@@ -704,7 +758,7 @@ func (s *Server) handleListPrompts(request *transport.BaseJSONRPCRequest, extra 
 	}, nil
 }
 
-func (s *Server) handleListResources(request *transport.BaseJSONRPCRequest, extra protocol.RequestHandlerExtra) (transport.JsonRpcBody, error) {
+func (s *Server) handleListResources(ctx context.Context, request *transport.BaseJSONRPCRequest, extra protocol.RequestHandlerExtra) (transport.JsonRpcBody, error) {
 	type resourceRequestParams struct {
 		Cursor *string `json:"cursor"`
 	}
@@ -772,7 +826,7 @@ func (s *Server) handleListResources(request *transport.BaseJSONRPCRequest, extr
 	}, nil
 }
 
-func (s *Server) handlePromptCalls(req *transport.BaseJSONRPCRequest, extra protocol.RequestHandlerExtra) (transport.JsonRpcBody, error) {
+func (s *Server) handlePromptCalls(ctx context.Context, req *transport.BaseJSONRPCRequest, extra protocol.RequestHandlerExtra) (transport.JsonRpcBody, error) {
 	params := baseGetPromptRequestParamsArguments{}
 	// Instantiate a struct of the type of the arguments
 	err := json.Unmarshal(req.Params, &params)
@@ -792,10 +846,10 @@ func (s *Server) handlePromptCalls(req *transport.BaseJSONRPCRequest, extra prot
 	if promptToUse == nil {
 		return nil, errors.Wrapf(err, "unknown prompt: %s", req.Method)
 	}
-	return promptToUse.Handler(params), nil
+	return promptToUse.Handler(ctx, params), nil
 }
 
-func (s *Server) handleResourceCalls(req *transport.BaseJSONRPCRequest, extra protocol.RequestHandlerExtra) (transport.JsonRpcBody, error) {
+func (s *Server) handleResourceCalls(ctx context.Context, req *transport.BaseJSONRPCRequest, extra protocol.RequestHandlerExtra) (transport.JsonRpcBody, error) {
 	params := readResourceRequestParams{}
 	// Instantiate a struct of the type of the arguments
 	err := json.Unmarshal(req.Params, &params)
@@ -815,10 +869,10 @@ func (s *Server) handleResourceCalls(req *transport.BaseJSONRPCRequest, extra pr
 	if resourceToUse == nil {
 		return nil, errors.Wrapf(err, "unknown prompt: %s", req.Method)
 	}
-	return resourceToUse.Handler(), nil
+	return resourceToUse.Handler(ctx), nil
 }
 
-func (s *Server) handlePing(request *transport.BaseJSONRPCRequest, extra protocol.RequestHandlerExtra) (transport.JsonRpcBody, error) {
+func (s *Server) handlePing(ctx context.Context, request *transport.BaseJSONRPCRequest, extra protocol.RequestHandlerExtra) (transport.JsonRpcBody, error) {
 	return map[string]interface{}{}, nil
 }
 
@@ -826,12 +880,20 @@ func validateToolHandler(handler any) error {
 	handlerValue := reflect.ValueOf(handler)
 	handlerType := handlerValue.Type()
 
-	if handlerType.NumIn() != 1 {
-		return fmt.Errorf("handler must take exactly one argument, got %d", handlerType.NumIn())
+	// We allow the handler to take a context.Context as the first argument optionally
+	if handlerType.NumIn() != 1 && handlerType.NumIn() != 2 {
+		return fmt.Errorf("handler must take exactly one or two arguments, got %d", handlerType.NumIn())
 	}
 
 	if handlerType.NumOut() != 2 {
 		return fmt.Errorf("handler must return exactly two values, got %d", handlerType.NumOut())
+	}
+
+	if handlerType.NumIn() == 2 {
+		// Check that the first argument is a context.Context
+		if handlerType.In(0) != reflect.TypeOf((*context.Context)(nil)).Elem() {
+			return fmt.Errorf("when a handler has 2 arguments, handler must take context.Context as the first argument, got %s", handlerType.In(0).Name())
+		}
 	}
 
 	// Check that the output type is *tools.ToolResponse

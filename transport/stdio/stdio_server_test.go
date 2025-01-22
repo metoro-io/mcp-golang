@@ -3,10 +3,11 @@ package stdio
 import (
 	"bytes"
 	"context"
-	"github.com/metoro-io/mcp-golang/transport"
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/metoro-io/mcp-golang/transport"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -21,12 +22,13 @@ func TestStdioServerTransport(t *testing.T) {
 		var wg sync.WaitGroup
 		wg.Add(1)
 
-		tr.SetMessageHandler(func(msg *transport.BaseJsonRpcMessage) {
+		ctx := context.Background()
+
+		tr.SetMessageHandler(func(ctx context.Context, msg *transport.BaseJsonRpcMessage) {
 			receivedMsg = msg
 			wg.Done()
 		})
 
-		ctx := context.Background()
 		err := tr.Start(ctx)
 		assert.NoError(t, err)
 
@@ -87,7 +89,7 @@ func TestStdioServerTransport(t *testing.T) {
 			Id:      1,
 		}
 
-		err := tr.Send(transport.NewBaseMessageResponse(msg))
+		err := tr.Send(context.Background(), transport.NewBaseMessageResponse(msg))
 		assert.NoError(t, err)
 
 		// Verify output contains the message and newline

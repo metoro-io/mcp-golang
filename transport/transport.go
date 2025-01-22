@@ -15,7 +15,7 @@ type Transport interface {
 	Start(ctx context.Context) error
 
 	// Send sends a JSON-RPC message (request, notification or response).
-	Send(message *BaseJsonRpcMessage) error
+	Send(ctx context.Context, message *BaseJsonRpcMessage) error
 
 	// Close closes the connection.
 	Close() error
@@ -30,5 +30,5 @@ type Transport interface {
 
 	// SetMessageHandler sets the callback for when a message (request, notification or response) is received over the connection.
 	// Partially deserializes the messages to pass a BaseJsonRpcMessage
-	SetMessageHandler(handler func(message *BaseJsonRpcMessage))
+	SetMessageHandler(handler func(ctx context.Context, message *BaseJsonRpcMessage))
 }

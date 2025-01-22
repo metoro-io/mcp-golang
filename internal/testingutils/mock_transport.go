@@ -2,8 +2,9 @@ package testingutils
 
 import (
 	"context"
-	"github.com/metoro-io/mcp-golang/transport"
 	"sync"
+
+	"github.com/metoro-io/mcp-golang/transport"
 )
 
 // MockTransport implements Transport interface for testing
@@ -13,7 +14,7 @@ type MockTransport struct {
 	// Callbacks
 	onClose   func()
 	onError   func(error)
-	onMessage func(message *transport.BaseJsonRpcMessage)
+	onMessage func(ctx context.Context, message *transport.BaseJsonRpcMessage)
 
 	// Test helpers
 	messages []*transport.BaseJsonRpcMessage
@@ -34,7 +35,7 @@ func (t *MockTransport) Start(ctx context.Context) error {
 	return nil
 }
 
-func (t *MockTransport) Send(message *transport.BaseJsonRpcMessage) error {
+func (t *MockTransport) Send(ctx context.Context, message *transport.BaseJsonRpcMessage) error {
 	t.mu.Lock()
 	t.messages = append(t.messages, message)
 	t.mu.Unlock()
@@ -63,7 +64,7 @@ func (t *MockTransport) SetErrorHandler(handler func(error)) {
 	t.mu.Unlock()
 }
 
-func (t *MockTransport) SetMessageHandler(handler func(*transport.BaseJsonRpcMessage)) {
+func (t *MockTransport) SetMessageHandler(handler func(ctx context.Context, message *transport.BaseJsonRpcMessage)) {
 	t.mu.Lock()
 	t.onMessage = handler
 	t.mu.Unlock()
@@ -76,7 +77,7 @@ func (t *MockTransport) SimulateMessage(msg *transport.BaseJsonRpcMessage) {
 	handler := t.onMessage
 	t.mu.RUnlock()
 	if handler != nil {
-		handler(msg)
+		handler(context.Background(), msg)
 	}
 }
 

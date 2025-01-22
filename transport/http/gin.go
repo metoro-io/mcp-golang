@@ -28,7 +28,7 @@ func (t *GinTransport) Start(ctx context.Context) error {
 }
 
 // Send implements Transport.Send
-func (t *GinTransport) Send(message *transport.BaseJsonRpcMessage) error {
+func (t *GinTransport) Send(ctx context.Context, message *transport.BaseJsonRpcMessage) error {
 	key := message.JsonRpcResponse.Id
 	responseChannel := t.responseMap[int64(key)]
 	if responseChannel == nil {
@@ -61,7 +61,7 @@ func (t *GinTransport) SetErrorHandler(handler func(error)) {
 }
 
 // SetMessageHandler implements Transport.SetMessageHandler
-func (t *GinTransport) SetMessageHandler(handler func(message *transport.BaseJsonRpcMessage)) {
+func (t *GinTransport) SetMessageHandler(handler func(ctx context.Context, message *transport.BaseJsonRpcMessage)) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	t.messageHandler = handler
@@ -70,6 +70,8 @@ func (t *GinTransport) SetMessageHandler(handler func(message *transport.BaseJso
 // Handler returns a Gin handler function that can be used with Gin's router
 func (t *GinTransport) Handler() gin.HandlerFunc {
 	return func(c *gin.Context) {
+		ctx := context.Background()
+		ctx = context.WithValue(ctx, "ginContext", c)
 		if c.Request.Method != http.MethodPost {
 			c.String(http.StatusMethodNotAllowed, "Only POST method is supported")
 			return
@@ -81,7 +83,7 @@ func (t *GinTransport) Handler() gin.HandlerFunc {
 			return
 		}
 
-		response, err := t.handleMessage(body)
+		response, err := t.handleMessage(ctx, body)
 		if err != nil {
 			c.String(http.StatusInternalServerError, err.Error())
 			return

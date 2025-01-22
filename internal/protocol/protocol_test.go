@@ -4,10 +4,11 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"github.com/metoro-io/mcp-golang/internal/testingutils"
-	"github.com/metoro-io/mcp-golang/transport"
 	"testing"
 	"time"
+
+	"github.com/metoro-io/mcp-golang/internal/testingutils"
+	"github.com/metoro-io/mcp-golang/transport"
 )
 
 // TestProtocol_Connect verifies the basic connection functionality of the Protocol.
@@ -72,7 +73,7 @@ func TestProtocol_Close(t *testing.T) {
 // while maintaining proper message correlation and resource cleanup.
 func TestProtocol_Request(t *testing.T) {
 	p := NewProtocol(nil)
-	p.SetRequestHandler("test_method", func(req *transport.BaseJSONRPCRequest, extra RequestHandlerExtra) (transport.JsonRpcBody, error) {
+	p.SetRequestHandler("test_method", func(ctx context.Context, req *transport.BaseJSONRPCRequest, extra RequestHandlerExtra) (transport.JsonRpcBody, error) {
 		return transport.NewBaseMessageResponse(&transport.BaseJSONRPCResponse{
 			Jsonrpc: "2.0",
 			Id:      req.Id,
@@ -165,7 +166,7 @@ func TestProtocol_RequestHandler(t *testing.T) {
 
 	// Register request handler
 	handlerCalled := false
-	p.SetRequestHandler("test_method", func(req *transport.BaseJSONRPCRequest, extra RequestHandlerExtra) (transport.JsonRpcBody, error) {
+	p.SetRequestHandler("test_method", func(ctx context.Context, req *transport.BaseJSONRPCRequest, extra RequestHandlerExtra) (transport.JsonRpcBody, error) {
 		handlerCalled = true
 		return map[string]interface{}{"result": "handler result"}, nil
 	})

@@ -1,6 +1,7 @@
 package http
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -11,7 +12,7 @@ import (
 
 // baseTransport implements the common functionality for HTTP-based transports
 type baseTransport struct {
-	messageHandler func(message *transport.BaseJsonRpcMessage)
+	messageHandler func(ctx context.Context, message *transport.BaseJsonRpcMessage)
 	errorHandler   func(error)
 	closeHandler   func()
 	mu             sync.RWMutex
@@ -25,7 +26,7 @@ func newBaseTransport() *baseTransport {
 }
 
 // Send implements Transport.Send
-func (t *baseTransport) Send(message *transport.BaseJsonRpcMessage) error {
+func (t *baseTransport) Send(ctx context.Context, message *transport.BaseJsonRpcMessage) error {
 	key := message.JsonRpcResponse.Id
 	responseChannel := t.responseMap[int64(key)]
 	if responseChannel == nil {
@@ -58,14 +59,14 @@ func (t *baseTransport) SetErrorHandler(handler func(error)) {
 }
 
 // SetMessageHandler implements Transport.SetMessageHandler
-func (t *baseTransport) SetMessageHandler(handler func(message *transport.BaseJsonRpcMessage)) {
+func (t *baseTransport) SetMessageHandler(handler func(ctx context.Context, message *transport.BaseJsonRpcMessage)) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	t.messageHandler = handler
 }
 
 // handleMessage processes an incoming message and returns a response
-func (t *baseTransport) handleMessage(body []byte) (*transport.BaseJsonRpcMessage, error) {
+func (t *baseTransport) handleMessage(ctx context.Context, body []byte) (*transport.BaseJsonRpcMessage, error) {
 	// Store the response writer for later use
 	t.mu.Lock()
 	var key int64 = 0
@@ -93,7 +94,7 @@ func (t *baseTransport) handleMessage(body []byte) (*transport.BaseJsonRpcMessag
 		t.mu.RUnlock()
 
 		if handler != nil {
-			handler(transport.NewBaseMessageRequest(&request))
+			handler(ctx, transport.NewBaseMessageRequest(&request))
 		}
 	}
 
@@ -107,7 +108,7 @@ func (t *baseTransport) handleMessage(body []byte) (*transport.BaseJsonRpcMessag
 			t.mu.RUnlock()
 
 			if handler != nil {
-				handler(transport.NewBaseMessageNotification(&notification))
+				handler(ctx, transport.NewBaseMessageNotification(&notification))
 			}
 		}
 	}
@@ -122,7 +123,7 @@ func (t *baseTransport) handleMessage(body []byte) (*transport.BaseJsonRpcMessag
 			t.mu.RUnlock()
 
 			if handler != nil {
-				handler(transport.NewBaseMessageResponse(&response))
+				handler(ctx, transport.NewBaseMessageResponse(&response))
 			}
 		}
 	}
@@ -137,7 +138,7 @@ func (t *baseTransport) handleMessage(body []byte) (*transport.BaseJsonRpcMessag
 			t.mu.RUnlock()
 
 			if handler != nil {
-				handler(transport.NewBaseMessageError(&errorResponse))
+				handler(ctx, transport.NewBaseMessageError(&errorResponse))
 			}
 		}
 	}

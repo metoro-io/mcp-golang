@@ -1,6 +1,7 @@
 package mcp_golang
 
 import (
+	"context"
 	"testing"
 
 	"github.com/metoro-io/mcp-golang/internal/protocol"
@@ -183,7 +184,7 @@ func TestHandleListToolsPagination(t *testing.T) {
 	server.paginationLimit = &limit
 
 	// Test first page (no cursor)
-	resp, err := server.handleListTools(&transport.BaseJSONRPCRequest{
+	resp, err := server.handleListTools(context.Background(), &transport.BaseJSONRPCRequest{
 		Params: []byte(`{}`),
 	}, protocol.RequestHandlerExtra{})
 	if err != nil {
@@ -207,7 +208,7 @@ func TestHandleListToolsPagination(t *testing.T) {
 	}
 
 	// Test second page
-	resp, err = server.handleListTools(&transport.BaseJSONRPCRequest{
+	resp, err = server.handleListTools(context.Background(), &transport.BaseJSONRPCRequest{
 		Params: []byte(`{"cursor":"` + *toolsResp.NextCursor + `"}`),
 	}, protocol.RequestHandlerExtra{})
 	if err != nil {
@@ -231,7 +232,7 @@ func TestHandleListToolsPagination(t *testing.T) {
 	}
 
 	// Test last page
-	resp, err = server.handleListTools(&transport.BaseJSONRPCRequest{
+	resp, err = server.handleListTools(context.Background(), &transport.BaseJSONRPCRequest{
 		Params: []byte(`{"cursor":"` + *toolsResp.NextCursor + `"}`),
 	}, protocol.RequestHandlerExtra{})
 	if err != nil {
@@ -255,7 +256,7 @@ func TestHandleListToolsPagination(t *testing.T) {
 	}
 
 	// Test invalid cursor
-	_, err = server.handleListTools(&transport.BaseJSONRPCRequest{
+	_, err = server.handleListTools(context.Background(), &transport.BaseJSONRPCRequest{
 		Params: []byte(`{"cursor":"invalid-cursor"}`),
 	}, protocol.RequestHandlerExtra{})
 	if err == nil {
@@ -264,7 +265,7 @@ func TestHandleListToolsPagination(t *testing.T) {
 
 	// Test without pagination (should return all tools)
 	server.paginationLimit = nil
-	resp, err = server.handleListTools(&transport.BaseJSONRPCRequest{
+	resp, err = server.handleListTools(context.Background(), &transport.BaseJSONRPCRequest{
 		Params: []byte(`{}`),
 	}, protocol.RequestHandlerExtra{})
 	if err != nil {
@@ -311,7 +312,7 @@ func TestHandleListPromptsPagination(t *testing.T) {
 	server.paginationLimit = &limit
 
 	// Test first page (no cursor)
-	resp, err := server.handleListPrompts(&transport.BaseJSONRPCRequest{
+	resp, err := server.handleListPrompts(context.Background(), &transport.BaseJSONRPCRequest{
 		Params: []byte(`{}`),
 	}, protocol.RequestHandlerExtra{})
 	if err != nil {
@@ -335,7 +336,7 @@ func TestHandleListPromptsPagination(t *testing.T) {
 	}
 
 	// Test second page
-	resp, err = server.handleListPrompts(&transport.BaseJSONRPCRequest{
+	resp, err = server.handleListPrompts(context.Background(), &transport.BaseJSONRPCRequest{
 		Params: []byte(`{"cursor":"` + *promptsResp.NextCursor + `"}`),
 	}, protocol.RequestHandlerExtra{})
 	if err != nil {
@@ -359,7 +360,7 @@ func TestHandleListPromptsPagination(t *testing.T) {
 	}
 
 	// Test last page
-	resp, err = server.handleListPrompts(&transport.BaseJSONRPCRequest{
+	resp, err = server.handleListPrompts(context.Background(), &transport.BaseJSONRPCRequest{
 		Params: []byte(`{"cursor":"` + *promptsResp.NextCursor + `"}`),
 	}, protocol.RequestHandlerExtra{})
 	if err != nil {
@@ -383,7 +384,7 @@ func TestHandleListPromptsPagination(t *testing.T) {
 	}
 
 	// Test invalid cursor
-	_, err = server.handleListPrompts(&transport.BaseJSONRPCRequest{
+	_, err = server.handleListPrompts(context.Background(), &transport.BaseJSONRPCRequest{
 		Params: []byte(`{"cursor":"invalid-cursor"}`),
 	}, protocol.RequestHandlerExtra{})
 	if err == nil {
@@ -392,7 +393,7 @@ func TestHandleListPromptsPagination(t *testing.T) {
 
 	// Test without pagination (should return all prompts)
 	server.paginationLimit = nil
-	resp, err = server.handleListPrompts(&transport.BaseJSONRPCRequest{
+	resp, err = server.handleListPrompts(context.Background(), &transport.BaseJSONRPCRequest{
 		Params: []byte(`{}`),
 	}, protocol.RequestHandlerExtra{})
 	if err != nil {
@@ -436,7 +437,7 @@ func TestHandleListResourcesPagination(t *testing.T) {
 	server.paginationLimit = &limit
 
 	// Test first page (no cursor)
-	resp, err := server.handleListResources(&transport.BaseJSONRPCRequest{
+	resp, err := server.handleListResources(context.Background(), &transport.BaseJSONRPCRequest{
 		Params: []byte(`{}`),
 	}, protocol.RequestHandlerExtra{})
 	if err != nil {
@@ -460,7 +461,7 @@ func TestHandleListResourcesPagination(t *testing.T) {
 	}
 
 	// Test second page
-	resp, err = server.handleListResources(&transport.BaseJSONRPCRequest{
+	resp, err = server.handleListResources(context.Background(), &transport.BaseJSONRPCRequest{
 		Params: []byte(`{"cursor":"` + *resourcesResp.NextCursor + `"}`),
 	}, protocol.RequestHandlerExtra{})
 	if err != nil {
@@ -484,7 +485,7 @@ func TestHandleListResourcesPagination(t *testing.T) {
 	}
 
 	// Test last page
-	resp, err = server.handleListResources(&transport.BaseJSONRPCRequest{
+	resp, err = server.handleListResources(context.Background(), &transport.BaseJSONRPCRequest{
 		Params: []byte(`{"cursor":"` + *resourcesResp.NextCursor + `"}`),
 	}, protocol.RequestHandlerExtra{})
 	if err != nil {
@@ -508,7 +509,7 @@ func TestHandleListResourcesPagination(t *testing.T) {
 	}
 
 	// Test invalid cursor
-	_, err = server.handleListResources(&transport.BaseJSONRPCRequest{
+	_, err = server.handleListResources(context.Background(), &transport.BaseJSONRPCRequest{
 		Params: []byte(`{"cursor":"invalid-cursor"}`),
 	}, protocol.RequestHandlerExtra{})
 	if err == nil {
@@ -517,7 +518,7 @@ func TestHandleListResourcesPagination(t *testing.T) {
 
 	// Test without pagination (should return all resources)
 	server.paginationLimit = nil
-	resp, err = server.handleListResources(&transport.BaseJSONRPCRequest{
+	resp, err = server.handleListResources(context.Background(), &transport.BaseJSONRPCRequest{
 		Params: []byte(`{}`),
 	}, protocol.RequestHandlerExtra{})
 	if err != nil {

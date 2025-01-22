@@ -15,7 +15,7 @@ type HTTPTransport struct {
 	*baseTransport
 	server         *http.Server
 	endpoint       string
-	messageHandler func(message *transport.BaseJsonRpcMessage)
+	messageHandler func(ctx context.Context, message *transport.BaseJsonRpcMessage)
 	errorHandler   func(error)
 	closeHandler   func()
 	mu             sync.RWMutex
@@ -53,7 +53,7 @@ func (t *HTTPTransport) Start(ctx context.Context) error {
 }
 
 // Send implements Transport.Send
-func (t *HTTPTransport) Send(message *transport.BaseJsonRpcMessage) error {
+func (t *HTTPTransport) Send(ctx context.Context, message *transport.BaseJsonRpcMessage) error {
 	key := message.JsonRpcResponse.Id
 	responseChannel := t.responseMap[int64(key)]
 	if responseChannel == nil {
@@ -91,7 +91,7 @@ func (t *HTTPTransport) SetErrorHandler(handler func(error)) {
 }
 
 // SetMessageHandler implements Transport.SetMessageHandler
-func (t *HTTPTransport) SetMessageHandler(handler func(message *transport.BaseJsonRpcMessage)) {
+func (t *HTTPTransport) SetMessageHandler(handler func(ctx context.Context, message *transport.BaseJsonRpcMessage)) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	t.messageHandler = handler
@@ -103,13 +103,14 @@ func (t *HTTPTransport) handleRequest(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	ctx := r.Context()
 	body, err := t.readBody(r.Body)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
-	response, err := t.handleMessage(body)
+	response, err := t.handleMessage(ctx, body)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return

@@ -22,7 +22,7 @@ type StdioServerTransport struct {
 	readBuf   *stdio.ReadBuffer
 	onClose   func()
 	onError   func(error)
-	onMessage func(message *transport.BaseJsonRpcMessage)
+	onMessage func(ctx context.Context, message *transport.BaseJsonRpcMessage)
 }
 
 // NewStdioServerTransport creates a new StdioServerTransport using os.Stdin and os.Stdout
@@ -67,7 +67,7 @@ func (t *StdioServerTransport) Close() error {
 }
 
 // Send sends a JSON-RPC message
-func (t *StdioServerTransport) Send(message *transport.BaseJsonRpcMessage) error {
+func (t *StdioServerTransport) Send(ctx context.Context, message *transport.BaseJsonRpcMessage) error {
 	data, err := json.Marshal(message)
 	if err != nil {
 		return fmt.Errorf("failed to marshal message: %w", err)
@@ -98,7 +98,7 @@ func (t *StdioServerTransport) SetErrorHandler(handler func(error)) {
 }
 
 // SetMessageHandler sets the handler for incoming messages
-func (t *StdioServerTransport) SetMessageHandler(handler func(message *transport.BaseJsonRpcMessage)) {
+func (t *StdioServerTransport) SetMessageHandler(handler func(ctx context.Context, message *transport.BaseJsonRpcMessage)) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	t.onMessage = handler
@@ -165,7 +165,9 @@ func (t *StdioServerTransport) handleMessage(msg *transport.BaseJsonRpcMessage) 
 	handler := t.onMessage
 	t.mu.Unlock()
 
+	ctx := context.Background()
+
 	if handler != nil {
-		handler(msg)
+		handler(ctx, msg)
 	}
 }
