@@ -83,6 +83,102 @@ Create a file in ~/Library/Application Support/Claude/claude_desktop_config.json
 }
 ```
 
+## HTTP Server Example
+
+You can also create an HTTP-based MCP server. Note that HTTP transport is stateless and doesn't support bidirectional features like notifications - use stdio transport if you need those features.
+
+```go
+package main
+
+import (
+    "context"
+    "log"
+    "github.com/metoro-io/mcp-golang"
+    "github.com/metoro-io/mcp-golang/transport/http"
+)
+
+func main() {
+    // Create an HTTP transport
+    transport := http.NewHTTPTransport("/mcp")
+    transport.WithAddr(":8080")
+
+    // Create server with the HTTP transport
+    server := mcp.NewServer(transport)
+
+    // Register your tools
+    server.RegisterTool("hello", &HelloTool{})
+
+    // Start the server
+    if err := server.Serve(); err != nil {
+        log.Fatal(err)
+    }
+}
+```
+
+Or using the Gin framework:
+
+```go
+package main
+
+import (
+    "github.com/gin-gonic/gin"
+    "github.com/metoro-io/mcp-golang"
+    "github.com/metoro-io/mcp-golang/transport/http"
+)
+
+func main() {
+    // Create a Gin transport
+    transport := http.NewGinTransport()
+    
+    // Create server with the Gin transport
+    server := mcp.NewServer(transport)
+
+    // Register your tools
+    server.RegisterTool("hello", &HelloTool{})
+
+    // Set up Gin router
+    router := gin.Default()
+    router.POST("/mcp", transport.Handler())
+    
+    // Start the server
+    router.Run(":8080")
+}
+```
+
+## HTTP Client Example
+
+To connect to an HTTP-based MCP server:
+
+```go
+package main
+
+import (
+    "context"
+    "log"
+    "github.com/metoro-io/mcp-golang"
+    "github.com/metoro-io/mcp-golang/transport/http"
+)
+
+func main() {
+    // Create an HTTP client transport
+    transport := http.NewHTTPClientTransport("/mcp")
+    transport.WithBaseURL("http://localhost:8080")
+
+    // Create client with the HTTP transport
+    client := mcp.NewClient(transport)
+
+    // Use the client with context
+    ctx := context.Background()
+    response, err := client.CallTool(ctx, "hello", map[string]interface{}{
+        "name": "World",
+    })
+    if err != nil {
+        log.Fatal(err)
+    }
+    log.Printf("Response: %v", response)
+}
+```
+
 ## Next Steps
 
 - If you're interested in contributing to mcp-golang, check out [Development Guide](/development) for more detailed information

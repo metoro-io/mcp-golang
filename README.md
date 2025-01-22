@@ -30,10 +30,10 @@ Docs at [https://mcpgolang.com](https://mcpgolang.com)
 
 ## Highlights
 - 🛡️**Type safety** - Define your tool arguments as native go structs, have mcp-golang handle the rest. Automatic schema generation, deserialization, error handling etc.
-- 🚛 **Custom transports** - Use the built-in transports or write your own.
+- 🚛 **Custom transports** - Use the built-in transports (stdio for full feature support, HTTP for stateless communication) or write your own.
 - ⚡ **Low boilerplate** - mcp-golang generates all the MCP endpoints for you apart from your tools, prompts and resources.
 - 🧩 **Modular** - The library is split into three components: transport, protocol and server/client. Use them all or take what you need.
-- 🔄 **Bi-directional** - Full support for both server and client implementations.
+- 🔄 **Bi-directional** - Full support for both server and client implementations through stdio transport.
 
 ## Example Usage
 
@@ -91,6 +91,25 @@ func main() {
 	<-done
 }
 ```
+
+### HTTP Server Example
+
+You can also create an HTTP-based server using either the standard HTTP transport or Gin framework:
+
+```go
+// Standard HTTP
+transport := http.NewHTTPTransport("/mcp")
+transport.WithAddr(":8080")
+server := mcp_golang.NewServer(transport)
+
+// Or with Gin framework
+transport := http.NewGinTransport()
+router := gin.Default()
+router.POST("/mcp", transport.Handler())
+server := mcp_golang.NewServer(transport)
+```
+
+Note: HTTP transports are stateless and don't support bidirectional features like notifications. Use stdio transport if you need those features.
 
 ### Client Example
 
@@ -209,7 +228,9 @@ Open a PR to add your own projects!
 - [x] Pagination
 
 ### Transports
-- [x] Stdio
+- [x] Stdio - Full support for all features including bidirectional communication
+- [x] HTTP - Stateless transport for simple request-response scenarios (no notifications support)
+- [x] Gin - HTTP transport with Gin framework integration (stateless, no notifications support)
 - [x] SSE
 - [x] Custom transport support
 - [ ] HTTPS with custom auth support - in progress. Not currently part of the spec but we'll be adding experimental support for it.

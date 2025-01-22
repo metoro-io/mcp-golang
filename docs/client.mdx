@@ -197,4 +197,60 @@ if err != nil {
 
 ## Complete Example
 
-For a complete working example, check out our [example client implementation](https://github.com/metoro-io/mcp-golang/tree/main/examples/client). 
+For a complete working example, check out our [example client implementation](https://github.com/metoro-io/mcp-golang/tree/main/examples/client).
+
+## Transport Options
+
+The MCP client supports multiple transport options:
+
+### Standard I/O Transport
+
+For command-line tools that communicate through stdin/stdout:
+
+```go
+transport := stdio.NewStdioClientTransport()
+client := mcp.NewClient(transport)
+```
+
+This transport supports all MCP features including bidirectional communication and notifications.
+
+### HTTP Transport
+
+For web-based tools that communicate over HTTP/HTTPS:
+
+```go
+transport := http.NewHTTPClientTransport("/mcp")
+transport.WithBaseURL("http://localhost:8080")
+client := mcp.NewClient(transport)
+```
+
+Note that the HTTP transport is stateless and does not support bidirectional features like notifications. Each request-response cycle is independent, making it suitable for simple tool invocations but not for scenarios requiring real-time updates or persistent connections.
+
+## Context Support
+
+All client operations now support context propagation:
+
+```go
+ctx := context.Background()
+// With timeout
+ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+defer cancel()
+
+// Call tool with context
+response, err := client.CallTool(ctx, "tool-name", args)
+if err != nil {
+    // Handle error
+}
+
+// List tools with context
+tools, err := client.ListTools(ctx)
+if err != nil {
+    // Handle error
+}
+```
+
+The context allows you to:
+- Set timeouts for operations
+- Cancel long-running operations
+- Pass request-scoped values
+- Implement tracing and monitoring 

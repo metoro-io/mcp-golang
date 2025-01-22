@@ -76,4 +76,52 @@ server: {"id":10,"jsonrpc":"2.0","result":{"content":[{"text":"Hello, claude!","
 * **Optional fields** All fields are optional by default. Just don't use the `jsonschema:"required"` tag.
 * **Description** Use the `jsonschema:"description"` tag to add a description to the argument.
 
+## HTTP Transport
+
+The MCP SDK now supports HTTP transport for both client and server implementations. This allows you to build MCP tools that communicate over HTTP/HTTPS endpoints.
+
+**Note:** The HTTP transport implementations are stateless, which means they don't support bidirectional communication features like notifications. If you need to send notifications or maintain a persistent connection between client and server, use the stdio transport instead.
+
+### HTTP Server
+
+There are two server implementations available:
+
+1. Standard HTTP Server:
+```go
+transport := http.NewHTTPTransport("/mcp")
+transport.WithAddr(":8080") // Optional, defaults to :8080
+```
+
+2. Gin Framework Server:
+```go
+transport := http.NewGinTransport()
+router := gin.Default()
+router.POST("/mcp", transport.Handler())
+```
+
+### HTTP Client
+
+The HTTP client transport allows you to connect to MCP servers over HTTP:
+
+```go
+transport := http.NewHTTPClientTransport("/mcp")
+transport.WithBaseURL("http://localhost:8080")
+```
+
+### Context Support
+
+All transport implementations now support context propagation. This allows you to pass request-scoped data and handle timeouts/cancellation:
+
+```go
+transport.SetMessageHandler(func(ctx context.Context, msg *transport.BaseJsonRpcMessage) {
+    // Access context values or handle cancellation
+    if deadline, ok := ctx.Deadline(); ok {
+        // Handle deadline
+    }
+    // Process message
+})
+```
+
+The context is propagated through all MCP operations, making it easier to implement timeouts, tracing, and other cross-cutting concerns.
+
 
