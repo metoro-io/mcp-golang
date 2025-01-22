@@ -6,7 +6,6 @@ import (
 
 	"github.com/metoro-io/mcp-golang/internal/protocol"
 	"github.com/metoro-io/mcp-golang/internal/testingutils"
-	"github.com/metoro-io/mcp-golang/internal/tools"
 	"github.com/metoro-io/mcp-golang/transport"
 )
 
@@ -191,7 +190,7 @@ func TestHandleListToolsPagination(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	toolsResp, ok := resp.(tools.ToolsResponse)
+	toolsResp, ok := resp.(ToolsResponse)
 	if !ok {
 		t.Fatal("Expected tools.ToolsResponse")
 	}
@@ -215,7 +214,7 @@ func TestHandleListToolsPagination(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	toolsResp, ok = resp.(tools.ToolsResponse)
+	toolsResp, ok = resp.(ToolsResponse)
 	if !ok {
 		t.Fatal("Expected tools.ToolsResponse")
 	}
@@ -239,7 +238,7 @@ func TestHandleListToolsPagination(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	toolsResp, ok = resp.(tools.ToolsResponse)
+	toolsResp, ok = resp.(ToolsResponse)
 	if !ok {
 		t.Fatal("Expected tools.ToolsResponse")
 	}
@@ -272,7 +271,7 @@ func TestHandleListToolsPagination(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	toolsResp, ok = resp.(tools.ToolsResponse)
+	toolsResp, ok = resp.(ToolsResponse)
 	if !ok {
 		t.Fatal("Expected ToolsResponse")
 	}

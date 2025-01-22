@@ -12,7 +12,6 @@ import (
 	"github.com/invopop/jsonschema"
 	"github.com/metoro-io/mcp-golang/internal/datastructures"
 	"github.com/metoro-io/mcp-golang/internal/protocol"
-	"github.com/metoro-io/mcp-golang/internal/tools"
 	"github.com/metoro-io/mcp-golang/transport"
 	"github.com/pkg/errors"
 )
@@ -630,17 +629,17 @@ func (s *Server) handleListTools(ctx context.Context, request *transport.BaseJSO
 		}
 	}
 
-	toolsToReturn := make([]tools.ToolRetType, 0)
+	toolsToReturn := make([]ToolRetType, 0)
 
 	for i := startPosition; i < endPosition; i++ {
-		toolsToReturn = append(toolsToReturn, tools.ToolRetType{
+		toolsToReturn = append(toolsToReturn, ToolRetType{
 			Name:        orderedTools[i].Name,
 			Description: &orderedTools[i].Description,
 			InputSchema: orderedTools[i].ToolInputSchema,
 		})
 	}
 
-	return tools.ToolsResponse{
+	return ToolsResponse{
 		Tools: toolsToReturn,
 		NextCursor: func() *string {
 			if s.paginationLimit != nil && len(toolsToReturn) >= *s.paginationLimit {

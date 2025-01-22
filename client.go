@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 
 	"github.com/metoro-io/mcp-golang/internal/protocol"
-	"github.com/metoro-io/mcp-golang/internal/tools"
 	"github.com/metoro-io/mcp-golang/transport"
 	"github.com/pkg/errors"
 )
@@ -60,7 +59,7 @@ func (c *Client) Initialize(ctx context.Context) (*InitializeResponse, error) {
 }
 
 // ListTools retrieves the list of available tools from the server
-func (c *Client) ListTools(ctx context.Context, cursor *string) (*tools.ToolsResponse, error) {
+func (c *Client) ListTools(ctx context.Context, cursor *string) (*ToolsResponse, error) {
 	if !c.initialized {
 		return nil, errors.New("client not initialized")
 	}
@@ -79,7 +78,7 @@ func (c *Client) ListTools(ctx context.Context, cursor *string) (*tools.ToolsRes
 		return nil, errors.New("invalid response type")
 	}
 
-	var toolsResponse tools.ToolsResponse
+	var toolsResponse ToolsResponse
 	err = json.Unmarshal(responseBytes, &toolsResponse)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to unmarshal tools response")
