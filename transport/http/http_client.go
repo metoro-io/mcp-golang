@@ -21,6 +21,7 @@ type HTTPClientTransport struct {
 	closeHandler   func()
 	mu             sync.RWMutex
 	client         *http.Client
+	headers        map[string]string
 }
 
 // NewHTTPClientTransport creates a new HTTP client transport that connects to the specified endpoint
@@ -28,12 +29,19 @@ func NewHTTPClientTransport(endpoint string) *HTTPClientTransport {
 	return &HTTPClientTransport{
 		endpoint: endpoint,
 		client:   &http.Client{},
+		headers:  make(map[string]string),
 	}
 }
 
 // WithBaseURL sets the base URL to connect to
 func (t *HTTPClientTransport) WithBaseURL(baseURL string) *HTTPClientTransport {
 	t.baseURL = baseURL
+	return t
+}
+
+// WithHeader adds a header to the request
+func (t *HTTPClientTransport) WithHeader(key, value string) *HTTPClientTransport {
+	t.headers[key] = value
 	return t
 }
 
@@ -56,6 +64,9 @@ func (t *HTTPClientTransport) Send(ctx context.Context, message *transport.BaseJ
 		return fmt.Errorf("failed to create request: %w", err)
 	}
 	req.Header.Set("Content-Type", "application/json")
+	for key, value := range t.headers {
+		req.Header.Set(key, value)
+	}
 
 	resp, err := t.client.Do(req)
 	if err != nil {
