@@ -149,6 +149,18 @@ func WithPaginationLimit(limit int) ServerOptions {
 	}
 }
 
+func WithName(name string) ServerOptions {
+	return func(s *Server) {
+		s.serverName = name
+	}
+}
+
+func WithVersion(version string) ServerOptions {
+	return func(s *Server) {
+		s.serverVersion = version
+	}
+}
+
 func NewServer(transport transport.Transport, options ...ServerOptions) *Server {
 	server := &Server{
 		protocol:  protocol.NewProtocol(nil),

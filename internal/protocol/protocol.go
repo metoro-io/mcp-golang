@@ -69,9 +69,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/metoro-io/mcp-golang/transport"
 	"sync"
 	"time"
+
+	"github.com/metoro-io/mcp-golang/transport"
 )
 
 const DefaultRequestTimeoutMsec = 60000

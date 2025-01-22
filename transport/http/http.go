@@ -20,13 +20,15 @@ type HTTPTransport struct {
 	closeHandler   func()
 	mu             sync.RWMutex
 	addr           string
+	responseMap    map[int64]chan *transport.BaseJsonRpcMessage
 }
 
 // NewHTTPTransport creates a new HTTP transport that listens on the specified endpoint
 func NewHTTPTransport(endpoint string) *HTTPTransport {
 	return &HTTPTransport{
-		endpoint: endpoint,
-		addr:     ":8080", // Default port
+		endpoint:    endpoint,
+		addr:        ":8080", // Default port
+		responseMap: make(map[int64]chan *transport.BaseJsonRpcMessage),
 	}
 }
 
@@ -51,7 +53,13 @@ func (t *HTTPTransport) Start(ctx context.Context) error {
 
 // Send implements Transport.Send
 func (t *HTTPTransport) Send(message *transport.BaseJsonRpcMessage) error {
-	return fmt.Errorf("send not supported in stateless HTTP transport - this transport only supports receiving messages")
+	key := message.JsonRpcResponse.Id
+	responseChannel := t.responseMap[int64(key)]
+	if responseChannel == nil {
+		return fmt.Errorf("no response channel found for key: %d", key)
+	}
+	responseChannel <- message
+	return nil
 }
 
 // Close implements Transport.Close
@@ -103,9 +111,28 @@ func (t *HTTPTransport) handleRequest(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Store the response writer for later use
+	t.mu.Lock()
+	var key int64 = 0
+
+	for key < 1000000 {
+		if _, ok := t.responseMap[key]; !ok {
+			break
+		}
+		key = key + 1
+	}
+	t.responseMap[key] = make(chan *transport.BaseJsonRpcMessage)
+	t.mu.Unlock()
+
+	var prevId *transport.RequestId = nil
+	deserialized := false
 	// Try to unmarshal as a request first
 	var request transport.BaseJSONRPCRequest
-	if err := json.Unmarshal(body, &request); err == nil && request.Id != 0 {
+	if err := json.Unmarshal(body, &request); err == nil {
+		deserialized = true
+		id := request.Id
+		prevId = &id
+		request.Id = transport.RequestId(key)
 		t.mu.RLock()
 		handler := t.messageHandler
 		t.mu.RUnlock()
@@ -113,55 +140,67 @@ func (t *HTTPTransport) handleRequest(w http.ResponseWriter, r *http.Request) {
 		if handler != nil {
 			handler(transport.NewBaseMessageRequest(&request))
 		}
-		w.WriteHeader(http.StatusOK)
-		return
 	}
 
 	// Try as a notification
 	var notification transport.BaseJSONRPCNotification
-	if err := json.Unmarshal(body, &notification); err == nil {
-		t.mu.RLock()
-		handler := t.messageHandler
-		t.mu.RUnlock()
+	if !deserialized {
+		if err := json.Unmarshal(body, &notification); err == nil {
+			deserialized = true
+			t.mu.RLock()
+			handler := t.messageHandler
+			t.mu.RUnlock()
 
-		if handler != nil {
-			handler(transport.NewBaseMessageNotification(&notification))
+			if handler != nil {
+				handler(transport.NewBaseMessageNotification(&notification))
+			}
 		}
-		w.WriteHeader(http.StatusOK)
-		return
 	}
 
 	// Try as a response
 	var response transport.BaseJSONRPCResponse
-	if err := json.Unmarshal(body, &response); err == nil {
-		t.mu.RLock()
-		handler := t.messageHandler
-		t.mu.RUnlock()
+	if !deserialized {
+		if err := json.Unmarshal(body, &response); err == nil {
+			deserialized = true
+			t.mu.RLock()
+			handler := t.messageHandler
+			t.mu.RUnlock()
 
-		if handler != nil {
-			handler(transport.NewBaseMessageResponse(&response))
+			if handler != nil {
+				handler(transport.NewBaseMessageResponse(&response))
+			}
 		}
-		w.WriteHeader(http.StatusOK)
-		return
 	}
 
 	// Try as an error
 	var errorResponse transport.BaseJSONRPCError
-	if err := json.Unmarshal(body, &errorResponse); err == nil {
-		t.mu.RLock()
-		handler := t.messageHandler
-		t.mu.RUnlock()
+	if !deserialized {
+		if err := json.Unmarshal(body, &errorResponse); err == nil {
+			deserialized = true
+			t.mu.RLock()
+			handler := t.messageHandler
+			t.mu.RUnlock()
 
-		if handler != nil {
-			handler(transport.NewBaseMessageError(&errorResponse))
+			if handler != nil {
+				handler(transport.NewBaseMessageError(&errorResponse))
+			}
 		}
-		w.WriteHeader(http.StatusOK)
+	}
+
+	// Block until the response is received
+	responseToUse := <-t.responseMap[key]
+	delete(t.responseMap, key)
+	if prevId != nil {
+		responseToUse.JsonRpcResponse.Id = *prevId
+	}
+	jsonData, err := json.Marshal(responseToUse)
+	if err != nil {
+		if t.errorHandler != nil {
+			t.errorHandler(fmt.Errorf("failed to marshal response: %w", err))
+		}
+		http.Error(w, "Failed to marshal response", http.StatusInternalServerError)
 		return
 	}
-
-	// If we get here, we couldn't parse the message
-	if t.errorHandler != nil {
-		t.errorHandler(fmt.Errorf("invalid JSON-RPC message"))
-	}
-	http.Error(w, "Invalid JSON-RPC message", http.StatusBadRequest)
+	w.Header().Set("Content-Type", "application/json")
+	w.Write(jsonData)
 }

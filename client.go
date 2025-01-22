@@ -38,7 +38,7 @@ func (c *Client) Initialize(ctx context.Context) (*InitializeResponse, error) {
 	}
 
 	// Make initialize request to server
-	response, err := c.protocol.Request(ctx, "initialize", nil, nil)
+	response, err := c.protocol.Request(ctx, "initialize", map[string]interface{}{}, nil)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to initialize")
 	}
