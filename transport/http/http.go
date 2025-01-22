@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 	"sync"
 
@@ -13,6 +12,7 @@ import (
 
 // HTTPTransport implements a stateless HTTP transport for MCP
 type HTTPTransport struct {
+	*baseTransport
 	server         *http.Server
 	endpoint       string
 	messageHandler func(message *transport.BaseJsonRpcMessage)
@@ -26,9 +26,10 @@ type HTTPTransport struct {
 // NewHTTPTransport creates a new HTTP transport that listens on the specified endpoint
 func NewHTTPTransport(endpoint string) *HTTPTransport {
 	return &HTTPTransport{
-		endpoint:    endpoint,
-		addr:        ":8080", // Default port
-		responseMap: make(map[int64]chan *transport.BaseJsonRpcMessage),
+		baseTransport: newBaseTransport(),
+		endpoint:      endpoint,
+		addr:          ":8080", // Default port
+		responseMap:   make(map[int64]chan *transport.BaseJsonRpcMessage),
 	}
 }
 
@@ -102,98 +103,19 @@ func (t *HTTPTransport) handleRequest(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	body, err := io.ReadAll(r.Body)
+	body, err := t.readBody(r.Body)
 	if err != nil {
-		if t.errorHandler != nil {
-			t.errorHandler(fmt.Errorf("failed to read request body: %w", err))
-		}
-		http.Error(w, "Failed to read request body", http.StatusBadRequest)
+		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
-	// Store the response writer for later use
-	t.mu.Lock()
-	var key int64 = 0
-
-	for key < 1000000 {
-		if _, ok := t.responseMap[key]; !ok {
-			break
-		}
-		key = key + 1
-	}
-	t.responseMap[key] = make(chan *transport.BaseJsonRpcMessage)
-	t.mu.Unlock()
-
-	var prevId *transport.RequestId = nil
-	deserialized := false
-	// Try to unmarshal as a request first
-	var request transport.BaseJSONRPCRequest
-	if err := json.Unmarshal(body, &request); err == nil {
-		deserialized = true
-		id := request.Id
-		prevId = &id
-		request.Id = transport.RequestId(key)
-		t.mu.RLock()
-		handler := t.messageHandler
-		t.mu.RUnlock()
-
-		if handler != nil {
-			handler(transport.NewBaseMessageRequest(&request))
-		}
+	response, err := t.handleMessage(body)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
 	}
 
-	// Try as a notification
-	var notification transport.BaseJSONRPCNotification
-	if !deserialized {
-		if err := json.Unmarshal(body, &notification); err == nil {
-			deserialized = true
-			t.mu.RLock()
-			handler := t.messageHandler
-			t.mu.RUnlock()
-
-			if handler != nil {
-				handler(transport.NewBaseMessageNotification(&notification))
-			}
-		}
-	}
-
-	// Try as a response
-	var response transport.BaseJSONRPCResponse
-	if !deserialized {
-		if err := json.Unmarshal(body, &response); err == nil {
-			deserialized = true
-			t.mu.RLock()
-			handler := t.messageHandler
-			t.mu.RUnlock()
-
-			if handler != nil {
-				handler(transport.NewBaseMessageResponse(&response))
-			}
-		}
-	}
-
-	// Try as an error
-	var errorResponse transport.BaseJSONRPCError
-	if !deserialized {
-		if err := json.Unmarshal(body, &errorResponse); err == nil {
-			deserialized = true
-			t.mu.RLock()
-			handler := t.messageHandler
-			t.mu.RUnlock()
-
-			if handler != nil {
-				handler(transport.NewBaseMessageError(&errorResponse))
-			}
-		}
-	}
-
-	// Block until the response is received
-	responseToUse := <-t.responseMap[key]
-	delete(t.responseMap, key)
-	if prevId != nil {
-		responseToUse.JsonRpcResponse.Id = *prevId
-	}
-	jsonData, err := json.Marshal(responseToUse)
+	jsonData, err := json.Marshal(response)
 	if err != nil {
 		if t.errorHandler != nil {
 			t.errorHandler(fmt.Errorf("failed to marshal response: %w", err))
@@ -201,6 +123,7 @@ func (t *HTTPTransport) handleRequest(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Failed to marshal response", http.StatusInternalServerError)
 		return
 	}
+
 	w.Header().Set("Content-Type", "application/json")
 	w.Write(jsonData)
 }
