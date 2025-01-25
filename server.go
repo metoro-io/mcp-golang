@@ -762,9 +762,13 @@ func (s *Server) handleListResources(ctx context.Context, request *transport.Bas
 		Cursor *string `json:"cursor"`
 	}
 	var params resourceRequestParams
-	err := json.Unmarshal(request.Params, &params)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to unmarshal arguments")
+	if request.Params == nil {
+		params = resourceRequestParams{}
+	} else {
+		err := json.Unmarshal(request.Params, &params)
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to unmarshal arguments")
+		}
 	}
 
 	// Order by URI for pagination
