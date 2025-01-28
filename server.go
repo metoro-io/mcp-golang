@@ -107,6 +107,7 @@ type Server struct {
 	tools              *datastructures.SyncMap[string, *tool]
 	prompts            *datastructures.SyncMap[string, *prompt]
 	resources          *datastructures.SyncMap[string, *resource]
+	resourceTemplates  *datastructures.SyncMap[string, *resourceTemplate]
 	serverInstructions *string
 	serverName         string
 	serverVersion      string
@@ -132,6 +133,13 @@ type resource struct {
 	Uri         string
 	mimeType    string
 	Handler     func(context.Context) *resourceResponseSent
+}
+
+type resourceTemplate struct {
+	Name        string
+	Description string
+	UriTemplate string
+	MimeType    string
 }
 
 type ServerOptions func(*Server)
@@ -163,11 +171,12 @@ func WithVersion(version string) ServerOptions {
 
 func NewServer(transport transport.Transport, options ...ServerOptions) *Server {
 	server := &Server{
-		protocol:  protocol.NewProtocol(nil),
-		transport: transport,
-		tools:     new(datastructures.SyncMap[string, *tool]),
-		prompts:   new(datastructures.SyncMap[string, *prompt]),
-		resources: new(datastructures.SyncMap[string, *resource]),
+		protocol:          protocol.NewProtocol(nil),
+		transport:         transport,
+		tools:             new(datastructures.SyncMap[string, *tool]),
+		prompts:           new(datastructures.SyncMap[string, *prompt]),
+		resources:         new(datastructures.SyncMap[string, *resource]),
+		resourceTemplates: new(datastructures.SyncMap[string, *resourceTemplate]),
 	}
 	for _, option := range options {
 		option(server)
@@ -297,6 +306,26 @@ func validateResourceHandler(handler any) error {
 	//	return fmt.Errorf("handler must return error, got %s", handlerType.Out(1).Name())
 	//}
 	return nil
+}
+
+func (s *Server) RegisterResourceTemplate(uriTemplate string, name string, description string, mimeType string) error {
+	s.resourceTemplates.Store(uriTemplate, &resourceTemplate{
+		Name:        name,
+		Description: description,
+		UriTemplate: uriTemplate,
+		MimeType:    mimeType,
+	})
+	return s.sendResourceListChangedNotification()
+}
+
+func (s *Server) CheckResourceTemplateRegistered(uriTemplate string) bool {
+	_, ok := s.resourceTemplates.Load(uriTemplate)
+	return ok
+}
+
+func (s *Server) DeregisterResourceTemplate(uriTemplate string) error {
+	s.resourceTemplates.Delete(uriTemplate)
+	return s.sendResourceListChangedNotification()
 }
 
 func (s *Server) RegisterPrompt(name string, description string, handler any) error {
@@ -553,6 +582,7 @@ func (s *Server) Serve() error {
 	pr.SetRequestHandler("prompts/list", s.handleListPrompts)
 	pr.SetRequestHandler("prompts/get", s.handlePromptCalls)
 	pr.SetRequestHandler("resources/list", s.handleListResources)
+	pr.SetRequestHandler("resources/templates/list", s.handleListResourceTemplates)
 	pr.SetRequestHandler("resources/read", s.handleResourceCalls)
 	err := pr.Connect(s.transport)
 	if err != nil {
@@ -822,6 +852,78 @@ func (s *Server) handleListResources(ctx context.Context, request *transport.Bas
 		NextCursor: func() *string {
 			if s.paginationLimit != nil && len(resourcesToReturn) >= *s.paginationLimit {
 				toString := base64.StdEncoding.EncodeToString([]byte(resourcesToReturn[len(resourcesToReturn)-1].Uri))
+				return &toString
+			}
+			return nil
+		}(),
+	}, nil
+}
+
+func (s *Server) handleListResourceTemplates(ctx context.Context, request *transport.BaseJSONRPCRequest, extra protocol.RequestHandlerExtra) (transport.JsonRpcBody, error) {
+	type resourceTemplateRequestParams struct {
+		Cursor *string `json:"cursor"`
+	}
+	var params resourceTemplateRequestParams
+	if request.Params == nil {
+		params = resourceTemplateRequestParams{}
+	} else {
+		err := json.Unmarshal(request.Params, &params)
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to unmarshal arguments")
+		}
+	}
+
+	// Order by URI template for pagination
+	var orderedTemplates []*resourceTemplate
+	s.resourceTemplates.Range(func(k string, t *resourceTemplate) bool {
+		orderedTemplates = append(orderedTemplates, t)
+		return true
+	})
+	sort.Slice(orderedTemplates, func(i, j int) bool {
+		return orderedTemplates[i].UriTemplate < orderedTemplates[j].UriTemplate
+	})
+
+	startPosition := 0
+	if params.Cursor != nil {
+		// Base64 decode the cursor
+		c, err := base64.StdEncoding.DecodeString(*params.Cursor)
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to decode cursor")
+		}
+		cString := string(c)
+		// Iterate through the templates until we find an entry > the cursor
+		for i := 0; i < len(orderedTemplates); i++ {
+			if orderedTemplates[i].UriTemplate > cString {
+				startPosition = i
+				break
+			}
+		}
+	}
+	endPosition := len(orderedTemplates)
+	if s.paginationLimit != nil {
+		// Make sure we don't go out of bounds
+		if len(orderedTemplates) > startPosition+*s.paginationLimit {
+			endPosition = startPosition + *s.paginationLimit
+		}
+	}
+
+	templatesToReturn := make([]*ResourceTemplateSchema, 0)
+	for i := startPosition; i < endPosition; i++ {
+		t := orderedTemplates[i]
+		templatesToReturn = append(templatesToReturn, &ResourceTemplateSchema{
+			Annotations: nil,
+			Description: &t.Description,
+			MimeType:    &t.MimeType,
+			Name:        t.Name,
+			UriTemplate: t.UriTemplate,
+		})
+	}
+
+	return ListResourceTemplatesResponse{
+		Templates: templatesToReturn,
+		NextCursor: func() *string {
+			if s.paginationLimit != nil && len(templatesToReturn) >= *s.paginationLimit {
+				toString := base64.StdEncoding.EncodeToString([]byte(templatesToReturn[len(templatesToReturn)-1].UriTemplate))
 				return &toString
 			}
 			return nil
