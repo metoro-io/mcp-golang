@@ -412,6 +412,42 @@ func TestHandleListPromptsPagination(t *testing.T) {
 	}
 }
 
+func TestHandleListResourcesNoParams(t *testing.T) {
+	mockTransport := testingutils.NewMockTransport()
+	server := NewServer(mockTransport)
+	err := server.Serve()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Register resources
+	resourceURIs := []string{"b://resource", "a://resource"}
+	for _, uri := range resourceURIs {
+		err = server.RegisterResource(uri, "resource-"+uri, "Test resource "+uri, "text/plain", func() (*ResourceResponse, error) {
+			return NewResourceResponse(NewTextEmbeddedResource(uri, "test content", "text/plain")), nil
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	// Test with no Params defined
+	resp, err := server.handleListResources(context.Background(), &transport.BaseJSONRPCRequest{}, protocol.RequestHandlerExtra{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	resourcesResp, ok := resp.(ListResourcesResponse)
+	if !ok {
+		t.Fatal("Expected ListResourcesResponse")
+	}
+
+	// Verify empty resources list
+	if len(resourcesResp.Resources) != len(resourceURIs) {
+		t.Errorf("Expected %d resources, got %d", len(resourceURIs), len(resourcesResp.Resources))
+	}
+}
+
 func TestHandleListResourcesPagination(t *testing.T) {
 	mockTransport := testingutils.NewMockTransport()
 	server := NewServer(mockTransport)
