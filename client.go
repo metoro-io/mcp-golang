@@ -15,7 +15,7 @@ type Client struct {
 	protocol     *protocol.Protocol
 	capabilities *ServerCapabilities
 	initialized  bool
-	info         *ClientInfo
+	info         ClientInfo
 }
 
 // NewClient creates a new MCP client with the specified transport
@@ -32,7 +32,7 @@ type ClientInfo struct {
 }
 
 // NewClientWithInfo create a new client with info. This is required by anthorpic mcp tools
-func NewClientWithInfo(transport transport.Transport, info *ClientInfo) *Client {
+func NewClientWithInfo(transport transport.Transport, info ClientInfo) *Client {
 	return &Client{
 		transport: transport,
 		protocol:  protocol.NewProtocol(nil),
