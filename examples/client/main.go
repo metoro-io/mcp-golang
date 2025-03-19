@@ -6,8 +6,12 @@ import (
 
 	"context"
 
-	mcp_golang "github.com/metoro-io/mcp-golang"
-	"github.com/metoro-io/mcp-golang/transport/stdio"
+	mcp_golang "github.com/rvoh-emccaleb/mcp-golang"
+	"github.com/rvoh-emccaleb/mcp-golang/transport/stdio"
+)
+
+const (
+	ProtocolVersion = "2024-11-05"
 )
 
 func main() {
@@ -17,6 +21,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to get stdin pipe: %v", err)
 	}
+
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
 		log.Fatalf("Failed to get stdout pipe: %v", err)
@@ -25,12 +30,23 @@ func main() {
 	if err := cmd.Start(); err != nil {
 		log.Fatalf("Failed to start server: %v", err)
 	}
+
 	defer cmd.Process.Kill()
 
 	clientTransport := stdio.NewStdioServerTransportWithIO(stdout, stdin)
 	client := mcp_golang.NewClient(clientTransport)
 
-	if _, err := client.Initialize(context.Background()); err != nil {
+	if _, err := client.Initialize(
+		context.Background(),
+		&mcp_golang.InitializeRequestParams{
+			ClientInfo: mcp_golang.InitializeRequestClientInfo{
+				Name:    "example-client",
+				Version: "0.1.0",
+			},
+			ProtocolVersion: ProtocolVersion,
+			Capabilities:    nil,
+		},
+	); err != nil {
 		log.Fatalf("Failed to initialize client: %v", err)
 	}
 

@@ -7,8 +7,8 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	mcp_golang "github.com/metoro-io/mcp-golang"
-	"github.com/metoro-io/mcp-golang/transport/http"
+	mcp_golang "github.com/rvoh-emccaleb/mcp-golang"
+	"github.com/rvoh-emccaleb/mcp-golang/transport/http"
 )
 
 // TimeArgs defines the arguments for the time tool

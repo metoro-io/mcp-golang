@@ -2,8 +2,8 @@ package main
 
 import (
 	"fmt"
-	mcp_golang "github.com/metoro-io/mcp-golang"
-	"github.com/metoro-io/mcp-golang/transport/stdio"
+	mcp_golang "github.com/rvoh-emccaleb/mcp-golang"
+	"github.com/rvoh-emccaleb/mcp-golang/transport/stdio"
 	"time"
 )
 

@@ -10,10 +10,10 @@ import (
 	"strings"
 
 	"github.com/invopop/jsonschema"
-	"github.com/metoro-io/mcp-golang/internal/datastructures"
-	"github.com/metoro-io/mcp-golang/internal/protocol"
-	"github.com/metoro-io/mcp-golang/transport"
 	"github.com/pkg/errors"
+	"github.com/rvoh-emccaleb/mcp-golang/internal/datastructures"
+	"github.com/rvoh-emccaleb/mcp-golang/internal/protocol"
+	"github.com/rvoh-emccaleb/mcp-golang/transport"
 )
 
 // Here we define the actual MCP server that users will create and run
@@ -107,6 +107,7 @@ type Server struct {
 	tools              *datastructures.SyncMap[string, *tool]
 	prompts            *datastructures.SyncMap[string, *prompt]
 	resources          *datastructures.SyncMap[string, *resource]
+	resourceTemplates  *datastructures.SyncMap[string, *resourceTemplate]
 	serverInstructions *string
 	serverName         string
 	serverVersion      string
@@ -132,6 +133,14 @@ type resource struct {
 	Uri         string
 	mimeType    string
 	Handler     func(context.Context) *resourceResponseSent
+}
+
+type resourceTemplate struct {
+	Name        string
+	Description string
+	Uri         string
+	MimeType    string
+	Parameters  []ResourceTemplateParameter
 }
 
 type ServerOptions func(*Server)
@@ -163,11 +172,12 @@ func WithVersion(version string) ServerOptions {
 
 func NewServer(transport transport.Transport, options ...ServerOptions) *Server {
 	server := &Server{
-		protocol:  protocol.NewProtocol(nil),
-		transport: transport,
-		tools:     new(datastructures.SyncMap[string, *tool]),
-		prompts:   new(datastructures.SyncMap[string, *prompt]),
-		resources: new(datastructures.SyncMap[string, *resource]),
+		protocol:          protocol.NewProtocol(nil),
+		transport:         transport,
+		tools:             new(datastructures.SyncMap[string, *tool]),
+		prompts:           new(datastructures.SyncMap[string, *prompt]),
+		resources:         new(datastructures.SyncMap[string, *resource]),
+		resourceTemplates: new(datastructures.SyncMap[string, *resourceTemplate]),
 	}
 	for _, option := range options {
 		option(server)
@@ -198,6 +208,24 @@ func (s *Server) sendToolListChangedNotification() error {
 		return nil
 	}
 	return s.protocol.Notification("notifications/tools/list_changed", nil)
+}
+
+// RegisterToolWithSchema registers a tool with a predefined JSON schema.
+// This is an alternative to RegisterTool, which uses reflection on the handler to create the schema.
+func (s *Server) RegisterToolWithSchema(name string, description string, handler any, schema *jsonschema.Schema) error {
+	err := validateToolHandler(handler)
+	if err != nil {
+		return err
+	}
+
+	s.tools.Store(name, &tool{
+		Name:            name,
+		Description:     description,
+		Handler:         createWrappedToolHandler(handler),
+		ToolInputSchema: schema, // Use the provided schema directly
+	})
+
+	return s.sendToolListChangedNotification()
 }
 
 func (s *Server) CheckToolRegistered(name string) bool {
@@ -244,8 +272,9 @@ func (s *Server) DeregisterResource(uri string) error {
 
 func createWrappedResourceHandler(userHandler any) func(ctx context.Context) *resourceResponseSent {
 	handlerValue := reflect.ValueOf(userHandler)
+	handlerType := handlerValue.Type()
+
 	return func(ctx context.Context) *resourceResponseSent {
-		handlerType := handlerValue.Type()
 		var args []reflect.Value
 		if handlerType.NumIn() == 1 {
 			args = []reflect.Value{reflect.ValueOf(ctx)}
@@ -554,6 +583,15 @@ func (s *Server) Serve() error {
 	pr.SetRequestHandler("prompts/get", s.handlePromptCalls)
 	pr.SetRequestHandler("resources/list", s.handleListResources)
 	pr.SetRequestHandler("resources/read", s.handleResourceCalls)
+	pr.SetRequestHandler("resources/templates/list", s.handleListResourceTemplates)
+
+	// Note: All notifications in MCP, other than this one, are sent from the server to the client, and can use SSE.
+	// This is the only notification that is sent from the client to the server. In order to make things work
+	// smoothly from the client's perspective, we choose to handle this notification as a request instead of
+	// as a notification, because working with the HTTP protocol is inherently request/response oriented, and the client
+	// would otherwise have to guess as to how long to wait before assuming the server is initialized.
+	pr.SetRequestHandler("notifications/initialized", s.handleInitializedNotification)
+
 	err := pr.Connect(s.transport)
 	if err != nil {
 		return err
@@ -574,6 +612,16 @@ func (s *Server) handleInitialize(ctx context.Context, request *transport.BaseJS
 			Version: s.serverVersion,
 		},
 	}, nil
+}
+
+// handleInitializedNotification is a request handler for the "notifications/initialized" notification.
+// This is the only notification in MCP that is sent from the client to the server. In order to make things work
+// smoothly from the client's perspective, we choose to handle this notification as a request instead of
+// as a notification, because working with the HTTP protocol is inherently request/response oriented, and the client
+// would otherwise have to guess as to how long to wait before assuming the server is initialized. We just return
+// an empty response body to the client to indicate that the notification has been received.
+func (s *Server) handleInitializedNotification(ctx context.Context, request *transport.BaseJSONRPCRequest, _ protocol.RequestHandlerExtra) (transport.JsonRpcBody, error) {
+	return map[string]interface{}{}, nil
 }
 
 func (s *Server) handleListTools(ctx context.Context, request *transport.BaseJSONRPCRequest, _ protocol.RequestHandlerExtra) (transport.JsonRpcBody, error) {
@@ -698,9 +746,13 @@ func (s *Server) handleListPrompts(ctx context.Context, request *transport.BaseJ
 		Cursor *string `json:"cursor"`
 	}
 	var params promptRequestParams
-	err := json.Unmarshal(request.Params, &params)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to unmarshal arguments")
+	if request.Params == nil {
+		params = promptRequestParams{}
+	} else {
+		err := json.Unmarshal(request.Params, &params)
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to unmarshal arguments")
+		}
 	}
 
 	// Order by name for pagination
@@ -875,6 +927,78 @@ func (s *Server) handleResourceCalls(ctx context.Context, req *transport.BaseJSO
 	return resourceToUse.Handler(ctx), nil
 }
 
+func (s *Server) handleListResourceTemplates(ctx context.Context, request *transport.BaseJSONRPCRequest, extra protocol.RequestHandlerExtra) (transport.JsonRpcBody, error) {
+	type templateRequestParams struct {
+		Cursor *string `json:"cursor"`
+	}
+	var params templateRequestParams
+	if request.Params == nil {
+		params = templateRequestParams{}
+	} else {
+		err := json.Unmarshal(request.Params, &params)
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to unmarshal arguments")
+		}
+	}
+
+	// Order by URI for pagination
+	var orderedTemplates []*resourceTemplate
+	s.resourceTemplates.Range(func(k string, t *resourceTemplate) bool {
+		orderedTemplates = append(orderedTemplates, t)
+		return true
+	})
+	sort.Slice(orderedTemplates, func(i, j int) bool {
+		return orderedTemplates[i].Uri < orderedTemplates[j].Uri
+	})
+
+	startPosition := 0
+	if params.Cursor != nil {
+		// Base64 decode the cursor
+		c, err := base64.StdEncoding.DecodeString(*params.Cursor)
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to decode cursor")
+		}
+		cString := string(c)
+		// Iterate through the templates until we find an entry > the cursor
+		for i := 0; i < len(orderedTemplates); i++ {
+			if orderedTemplates[i].Uri > cString {
+				startPosition = i
+				break
+			}
+		}
+	}
+	endPosition := len(orderedTemplates)
+	if s.paginationLimit != nil {
+		// Make sure we don't go out of bounds
+		if len(orderedTemplates) > startPosition+*s.paginationLimit {
+			endPosition = startPosition + *s.paginationLimit
+		}
+	}
+
+	templatesToReturn := make([]*ResourceTemplateSchema, 0)
+	for i := startPosition; i < endPosition; i++ {
+		t := orderedTemplates[i]
+		templatesToReturn = append(templatesToReturn, &ResourceTemplateSchema{
+			Description: &t.Description,
+			MimeType:    &t.MimeType,
+			Name:        t.Name,
+			Uri:         t.Uri,
+			Parameters:  t.Parameters,
+		})
+	}
+
+	return ListResourceTemplatesResponse{
+		Templates: templatesToReturn,
+		NextCursor: func() *string {
+			if s.paginationLimit != nil && len(templatesToReturn) >= *s.paginationLimit {
+				toString := base64.StdEncoding.EncodeToString([]byte(templatesToReturn[len(templatesToReturn)-1].Uri))
+				return &toString
+			}
+			return nil
+		}(),
+	}, nil
+}
+
 func (s *Server) handlePing(ctx context.Context, request *transport.BaseJSONRPCRequest, extra protocol.RequestHandlerExtra) (transport.JsonRpcBody, error) {
 	return map[string]interface{}{}, nil
 }
@@ -931,3 +1055,28 @@ var (
 		CommentMap:                 nil,
 	}
 )
+
+func (s *Server) RegisterResourceTemplate(uri string, name string, description string, mimeType string, parameters []ResourceTemplateParameter) error {
+	s.resourceTemplates.Store(uri, &resourceTemplate{
+		Name:        name,
+		Description: description,
+		Uri:         uri,
+		MimeType:    mimeType,
+		Parameters:  parameters,
+	})
+	return s.sendResourceTemplateListChangedNotification()
+}
+
+func (s *Server) DeregisterResourceTemplate(uri string) error {
+	s.resourceTemplates.Delete(uri)
+	return s.sendResourceTemplateListChangedNotification()
+}
+
+func (s *Server) sendResourceTemplateListChangedNotification() error {
+	if !s.isRunning {
+		return nil
+	}
+
+	// Note: Unsure if this one is in spec.
+	return s.protocol.Notification("notifications/resources/templates/list_changed", nil)
+}

@@ -4,9 +4,9 @@ import (
 	"context"
 	"testing"
 
-	"github.com/metoro-io/mcp-golang/internal/protocol"
-	"github.com/metoro-io/mcp-golang/internal/testingutils"
-	"github.com/metoro-io/mcp-golang/transport"
+	"github.com/rvoh-emccaleb/mcp-golang/internal/protocol"
+	"github.com/rvoh-emccaleb/mcp-golang/internal/testingutils"
+	"github.com/rvoh-emccaleb/mcp-golang/transport"
 )
 
 func TestServerListChangedNotifications(t *testing.T) {

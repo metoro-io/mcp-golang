@@ -21,13 +21,13 @@
   },
   "topbarCtaButton": {
     "name": "Github Repo",
-    "url": "https://github.com/metoro-io/mcp-golang"
+    "url": "https://github.com/rvoh-emccaleb/mcp-golang"
   },
   "anchors": [
     {
       "name": "Github",
       "icon": "github",
-      "url": "https://github.com/metoro-io/mcp-golang"
+      "url": "https://github.com/rvoh-emccaleb/mcp-golang"
     },
     {
       "name": "Discord Community",
@@ -62,7 +62,7 @@
   ],
   "footerSocials": {
     "x": "https://x.com/metoro_ai",
-    "github": "https://github.com/metoro-io/mcp-golang",
+    "github": "https://github.com/rvoh-emccaleb/mcp-golang",
     "website": "https://https://metoro.io/"
   }
 }

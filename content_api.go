@@ -85,13 +85,50 @@ type EmbeddedResource struct {
 
 // Custom JSON marshaling for EmbeddedResource
 func (c EmbeddedResource) MarshalJSON() ([]byte, error) {
+	type wrapper struct {
+		Type string `json:"embeddedResourceType"`
+		*TextResourceContents
+		*BlobResourceContents
+	}
+
+	w := wrapper{Type: string(c.EmbeddedResourceType)}
+
 	switch c.EmbeddedResourceType {
 	case embeddedResourceTypeBlob:
-		return json.Marshal(c.BlobResourceContents)
+		w.BlobResourceContents = c.BlobResourceContents
 	case embeddedResourceTypeText:
-		return json.Marshal(c.TextResourceContents)
+		w.TextResourceContents = c.TextResourceContents
 	default:
 		return nil, fmt.Errorf("unknown embedded resource type: %s", c.EmbeddedResourceType)
+	}
+
+	return json.Marshal(w)
+}
+
+func (c *EmbeddedResource) UnmarshalJSON(data []byte) error {
+	var wrapper struct {
+		Type string          `json:"embeddedResourceType"`
+		Raw  json.RawMessage `json:"-"`
+	}
+
+	wrapper.Raw = data
+	if err := json.Unmarshal(data, &wrapper); err != nil {
+		return err
+	}
+
+	c.EmbeddedResourceType = embeddedResourceType(wrapper.Type)
+
+	switch c.EmbeddedResourceType {
+	case embeddedResourceTypeText:
+		c.TextResourceContents = new(TextResourceContents)
+		return json.Unmarshal(wrapper.Raw, c.TextResourceContents)
+
+	case embeddedResourceTypeBlob:
+		c.BlobResourceContents = new(BlobResourceContents)
+		return json.Unmarshal(wrapper.Raw, c.BlobResourceContents)
+
+	default:
+		return fmt.Errorf("unknown embedded resource type: %s", wrapper.Type)
 	}
 }
 

@@ -3,6 +3,7 @@ package transport
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 )
 
 type JSONRPCMessage interface{}
@@ -191,6 +192,43 @@ func (m *BaseJsonRpcMessage) MarshalJSON() ([]byte, error) {
 	default:
 		return nil, errors.New("unknown message type, couldn't marshal")
 	}
+}
+
+// UnmarshalJSON implements json.Unmarshaler for BaseJsonRpcMessage
+func (m *BaseJsonRpcMessage) UnmarshalJSON(data []byte) error {
+	// Try as a request
+	var request BaseJSONRPCRequest
+	if err := json.Unmarshal(data, &request); err == nil {
+		m.Type = BaseMessageTypeJSONRPCRequestType
+		m.JsonRpcRequest = &request
+		return nil
+	}
+
+	// Try as a notification
+	var notification BaseJSONRPCNotification
+	if err := json.Unmarshal(data, &notification); err == nil {
+		m.Type = BaseMessageTypeJSONRPCNotificationType
+		m.JsonRpcNotification = &notification
+		return nil
+	}
+
+	// Try as a response
+	var response BaseJSONRPCResponse
+	if err := json.Unmarshal(data, &response); err == nil {
+		m.Type = BaseMessageTypeJSONRPCResponseType
+		m.JsonRpcResponse = &response
+		return nil
+	}
+
+	// Try as an error
+	var errorResponse BaseJSONRPCError
+	if err := json.Unmarshal(data, &errorResponse); err == nil {
+		m.Type = BaseMessageTypeJSONRPCErrorType
+		m.JsonRpcError = &errorResponse
+		return nil
+	}
+
+	return fmt.Errorf("failed to unmarshal JSON-RPC message, unrecognized type")
 }
 
 func NewBaseMessageNotification(notification *BaseJSONRPCNotification) *BaseJsonRpcMessage {

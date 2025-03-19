@@ -4,9 +4,9 @@ import (
 	"context"
 	"encoding/json"
 
-	"github.com/metoro-io/mcp-golang/internal/protocol"
-	"github.com/metoro-io/mcp-golang/transport"
 	"github.com/pkg/errors"
+	"github.com/rvoh-emccaleb/mcp-golang/internal/protocol"
+	"github.com/rvoh-emccaleb/mcp-golang/transport"
 )
 
 // Client represents an MCP client that can connect to and interact with MCP servers
@@ -25,8 +25,21 @@ func NewClient(transport transport.Transport) *Client {
 	}
 }
 
+// A bit loosey goosey, but it works for now.
+// See: https://spec.modelcontextprotocol.io/specification/2024-11-05/basic/lifecycle/
+type InitializeRequestParams struct {
+	ProtocolVersion string                      `json:"protocolVersion"`
+	ClientInfo      InitializeRequestClientInfo `json:"clientInfo"`
+	Capabilities    map[string]interface{}      `json:"capabilities"`
+}
+
+type InitializeRequestClientInfo struct {
+	Name    string `json:"name"`
+	Version string `json:"version"`
+}
+
 // Initialize connects to the server and retrieves its capabilities
-func (c *Client) Initialize(ctx context.Context) (*InitializeResponse, error) {
+func (c *Client) Initialize(ctx context.Context, params *InitializeRequestParams) (*InitializeResponse, error) {
 	if c.initialized {
 		return nil, errors.New("client already initialized")
 	}
@@ -36,8 +49,8 @@ func (c *Client) Initialize(ctx context.Context) (*InitializeResponse, error) {
 		return nil, errors.Wrap(err, "failed to connect transport")
 	}
 
-	// Make initialize request to server
-	response, err := c.protocol.Request(ctx, "initialize", map[string]interface{}{}, nil)
+	// Begin initialization handshake with server
+	response, err := c.protocol.Request(ctx, "initialize", params, nil)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to initialize")
 	}
@@ -53,8 +66,15 @@ func (c *Client) Initialize(ctx context.Context) (*InitializeResponse, error) {
 		return nil, errors.Wrap(err, "failed to unmarshal initialize response")
 	}
 
+	// Finish initialization handshake with server
+	err = c.protocol.Notification("notifications/initialized", map[string]interface{}{})
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to send initialized notification")
+	}
+
 	c.capabilities = &initResult.Capabilities
 	c.initialized = true
+
 	return &initResult, nil
 }
 
@@ -235,17 +255,13 @@ func (c *Client) ReadResource(ctx context.Context, uri string) (*ResourceRespons
 		return nil, errors.New("invalid response type")
 	}
 
-	var resourceResponse resourceResponseSent
+	var resourceResponse ResourceResponse
 	err = json.Unmarshal(responseBytes, &resourceResponse)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to unmarshal resource response")
 	}
 
-	if resourceResponse.Error != nil {
-		return nil, resourceResponse.Error
-	}
-
-	return resourceResponse.Response, nil
+	return &resourceResponse, nil
 }
 
 // Ping sends a ping request to the server to check connectivity
@@ -265,4 +281,14 @@ func (c *Client) Ping(ctx context.Context) error {
 // GetCapabilities returns the server capabilities obtained during initialization
 func (c *Client) GetCapabilities() *ServerCapabilities {
 	return c.capabilities
+}
+
+// Close cleans up resources used by the client, including the protocol and transport layers.
+// It should be called when the client is no longer needed.
+func (c *Client) Close() error {
+	if err := c.protocol.Close(); err != nil {
+		return errors.Wrap(err, "failed to close protocol")
+	}
+
+	return nil
 }

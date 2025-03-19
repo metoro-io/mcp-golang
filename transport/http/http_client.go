@@ -4,32 +4,45 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"sync"
+	"time"
 
-	"github.com/metoro-io/mcp-golang/transport"
+	"github.com/rvoh-emccaleb/mcp-golang/transport"
 )
 
 // HTTPClientTransport implements a client-side HTTP transport for MCP
 type HTTPClientTransport struct {
-	baseURL        string
-	endpoint       string
-	messageHandler func(ctx context.Context, message *transport.BaseJsonRpcMessage)
-	errorHandler   func(error)
-	closeHandler   func()
-	mu             sync.RWMutex
-	client         *http.Client
-	headers        map[string]string
+	baseURL            string
+	endpoint           string
+	messageHandler     func(ctx context.Context, message *transport.BaseJsonRpcMessage)
+	errorHandler       func(error)
+	closeHandler       func()
+	mu                 sync.RWMutex
+	client             *http.Client
+	notificationClient *http.Client
+	headers            map[string]string
 }
 
 // NewHTTPClientTransport creates a new HTTP client transport that connects to the specified endpoint
-func NewHTTPClientTransport(endpoint string) *HTTPClientTransport {
+func NewHTTPClientTransport(endpoint string, notificationTimeout time.Duration) *HTTPClientTransport {
+	if notificationTimeout <= 0 {
+		notificationTimeout = 1 * time.Millisecond // This is flaky, but it works for local demos.
+	}
+
 	return &HTTPClientTransport{
 		endpoint: endpoint,
 		client:   &http.Client{},
-		headers:  make(map[string]string),
+		notificationClient: &http.Client{
+			Transport: &http.Transport{
+				DisableKeepAlives: true,
+			},
+			Timeout: notificationTimeout,
+		},
+		headers: make(map[string]string),
 	}
 }
 
@@ -67,6 +80,27 @@ func (t *HTTPClientTransport) Send(ctx context.Context, message *transport.BaseJ
 	for key, value := range t.headers {
 		req.Header.Set(key, value)
 	}
+
+	// Note: The client usually doesn't send notifications. Really it's only used
+	// for the "notifications/initialized" method. The server may or may not be implemented
+	// to return a response, so we have to rely on having a long enough timeout to ensure the
+	// server has time to process the notification. This is inherently flaky, and should be
+	// improved upon.
+	if message.Type == transport.BaseMessageTypeJSONRPCNotificationType {
+		resp, err := t.notificationClient.Do(req)
+		if err != nil && !errors.Is(err, context.DeadlineExceeded) {
+			if t.errorHandler != nil {
+				t.errorHandler(fmt.Errorf("notification error: %w", err))
+			}
+		}
+		if resp != nil {
+			defer resp.Body.Close()
+		}
+
+		return nil
+	}
+
+	// For non-notifications, continue with normal synchronous request
 
 	resp, err := t.client.Do(req)
 	if err != nil {
