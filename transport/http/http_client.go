@@ -79,7 +79,7 @@ func (t *HTTPClientTransport) Send(ctx context.Context, message *transport.BaseJ
 		return fmt.Errorf("failed to read response: %w", err)
 	}
 
-	if resp.StatusCode != http.StatusOK {
+	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusAccepted {
 		return fmt.Errorf("server returned error: %s (status: %d)", string(body), resp.StatusCode)
 	}
 
