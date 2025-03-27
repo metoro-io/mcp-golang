@@ -5,22 +5,14 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"sync"
-
-	"github.com/metoro-io/mcp-golang/transport"
 )
 
 // HTTPTransport implements a stateless HTTP transport for MCP
 type HTTPTransport struct {
 	*baseTransport
-	server         *http.Server
-	endpoint       string
-	messageHandler func(ctx context.Context, message *transport.BaseJsonRpcMessage)
-	errorHandler   func(error)
-	closeHandler   func()
-	mu             sync.RWMutex
-	addr           string
-	responseMap    map[int64]chan *transport.BaseJsonRpcMessage
+	server   *http.Server
+	endpoint string
+	addr     string
 }
 
 // NewHTTPTransport creates a new HTTP transport that listens on the specified endpoint
@@ -29,7 +21,6 @@ func NewHTTPTransport(endpoint string) *HTTPTransport {
 		baseTransport: newBaseTransport(),
 		endpoint:      endpoint,
 		addr:          ":8080", // Default port
-		responseMap:   make(map[int64]chan *transport.BaseJsonRpcMessage),
 	}
 }
 
