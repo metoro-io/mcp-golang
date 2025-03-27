@@ -52,17 +52,6 @@ func (t *HTTPTransport) Start(ctx context.Context) error {
 	return t.server.ListenAndServe()
 }
 
-// Send implements Transport.Send
-func (t *HTTPTransport) Send(ctx context.Context, message *transport.BaseJsonRpcMessage) error {
-	key := message.JsonRpcResponse.Id
-	responseChannel := t.responseMap[int64(key)]
-	if responseChannel == nil {
-		return fmt.Errorf("no response channel found for key: %d", key)
-	}
-	responseChannel <- message
-	return nil
-}
-
 // Close implements Transport.Close
 func (t *HTTPTransport) Close() error {
 	if t.server != nil {
@@ -70,31 +59,8 @@ func (t *HTTPTransport) Close() error {
 			return err
 		}
 	}
-	if t.closeHandler != nil {
-		t.closeHandler()
-	}
+	t.baseTransport.Close()
 	return nil
-}
-
-// SetCloseHandler implements Transport.SetCloseHandler
-func (t *HTTPTransport) SetCloseHandler(handler func()) {
-	t.mu.Lock()
-	defer t.mu.Unlock()
-	t.closeHandler = handler
-}
-
-// SetErrorHandler implements Transport.SetErrorHandler
-func (t *HTTPTransport) SetErrorHandler(handler func(error)) {
-	t.mu.Lock()
-	defer t.mu.Unlock()
-	t.errorHandler = handler
-}
-
-// SetMessageHandler implements Transport.SetMessageHandler
-func (t *HTTPTransport) SetMessageHandler(handler func(ctx context.Context, message *transport.BaseJsonRpcMessage)) {
-	t.mu.Lock()
-	defer t.mu.Unlock()
-	t.messageHandler = handler
 }
 
 func (t *HTTPTransport) handleRequest(w http.ResponseWriter, r *http.Request) {
