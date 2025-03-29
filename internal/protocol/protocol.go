@@ -69,6 +69,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log"
 	"sync"
 	"time"
 
@@ -158,6 +159,7 @@ func NewProtocol(options *ProtocolOptions) *Protocol {
 
 	// Set up default handlers
 	p.SetNotificationHandler("notifications/cancelled", p.handleCancelledNotification)
+	p.SetNotificationHandler("notifications/message", p.messageNotificationHandler)
 	p.SetNotificationHandler("$/progress", p.handleProgressNotification)
 
 	return p
@@ -295,6 +297,20 @@ func (p *Protocol) handleRequest(ctx context.Context, request *transport.BaseJSO
 			p.handleError(fmt.Errorf("failed to send response: %w", err))
 		}
 	}()
+}
+
+func (p *Protocol) messageNotificationHandler(notification *transport.BaseJSONRPCNotification) error {
+	var params struct {
+		Level  string      `json:"level" yaml:"level" mapstructure:"level"`
+		Logger string      `json:"logger" yaml:"logger" mapstructure:"logger"`
+		Data   interface{} `json:"data" yaml:"data" mapstructure:"data"`
+	}
+	if err := json.Unmarshal(notification.Params, &params); err != nil {
+		log.Println("failed to unmarshal log_example params:", err.Error())
+		return fmt.Errorf("failed to unmarshal log_example params: %w", err)
+	}
+	log.Printf("[%s] %s\n", params.Level, params.Data.(string))
+	return nil
 }
 
 func (p *Protocol) handleProgressNotification(notification *transport.BaseJSONRPCNotification) error {
@@ -509,7 +525,6 @@ func (p *Protocol) Notification(method string, params interface{}) error {
 	if err != nil {
 		return fmt.Errorf("failed to marshal notification params: %w", err)
 	}
-
 	notification := &transport.BaseJSONRPCNotification{
 		Jsonrpc: "2.0",
 		Method:  method,

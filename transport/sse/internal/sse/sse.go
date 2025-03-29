@@ -32,7 +32,7 @@
 //	// Create a new SSE transport
 //	transport, err := NewSSETransport("/messages", responseWriter)
 //	if err != nil {
-//	    log.Fatal(err)
+//	    log_example.Fatal(err)
 //	}
 //
 //	// Set up message handling
@@ -42,7 +42,7 @@
 //
 //	// Start the SSE connection
 //	if err := transport.Start(context.Background()); err != nil {
-//	    log.Fatal(err)
+//	    log_example.Fatal(err)
 //	}
 //
 //	// Send a message
@@ -52,7 +52,7 @@
 //	    Id:      1,
 //	}
 //	if err := transport.Send(msg); err != nil {
-//	    log.Fatal(err)
+//	    log_example.Fatal(err)
 //	}
 //
 // */

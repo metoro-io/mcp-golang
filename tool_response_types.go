@@ -12,7 +12,7 @@ type ServerCapabilities struct {
 	// Experimental, non-standard capabilities that the server supports.
 	Experimental ServerCapabilitiesExperimental `json:"experimental,omitempty" yaml:"experimental,omitempty" mapstructure:"experimental,omitempty"`
 
-	// Present if the server supports sending log messages to the client.
+	// Present if the server supports sending log_example messages to the client.
 	Logging ServerCapabilitiesLogging `json:"logging,omitempty" yaml:"logging,omitempty" mapstructure:"logging,omitempty"`
 
 	// Present if the server offers any prompt templates.
@@ -28,7 +28,7 @@ type ServerCapabilities struct {
 // Experimental, non-standard capabilities that the server supports.
 type ServerCapabilitiesExperimental map[string]map[string]interface{}
 
-// Present if the server supports sending log messages to the client.
+// Present if the server supports sending log_example messages to the client.
 type ServerCapabilitiesLogging map[string]interface{}
 
 // Present if the server offers any prompt templates.
