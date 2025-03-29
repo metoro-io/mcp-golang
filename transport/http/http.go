@@ -15,12 +15,7 @@ type HTTPTransport struct {
 	*baseTransport
 	server         *http.Server
 	endpoint       string
-	messageHandler func(ctx context.Context, message *transport.BaseJsonRpcMessage)
-	errorHandler   func(error)
-	closeHandler   func()
-	mu             sync.RWMutex
 	addr           string
-	responseMap    map[int64]chan *transport.BaseJsonRpcMessage
 }
 
 // NewHTTPTransport creates a new HTTP transport that listens on the specified endpoint
@@ -29,7 +24,6 @@ func NewHTTPTransport(endpoint string) *HTTPTransport {
 		baseTransport: newBaseTransport(),
 		endpoint:      endpoint,
 		addr:          ":8080", // Default port
-		responseMap:   make(map[int64]chan *transport.BaseJsonRpcMessage),
 	}
 }
 
