@@ -5,7 +5,6 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"log"
 	"reflect"
 	"sort"
 	"strings"
@@ -195,11 +194,9 @@ func (s *Server) SendLogMessageNotification(level Level, logger string, data int
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	if level < s.loggingLevel {
-		log.Printf("ignoring message with level %v from %v\n", level, logger)
 		return nil
 	}
 	if err := s.protocol.Notification("notifications/message", newLoggingMessageParams(level, logger, data)); err != nil {
-		log.Printf("error sending log_example message notification: %v\n", err)
 		return err
 	}
 	return nil
@@ -597,7 +594,7 @@ func (s *Server) Serve() error {
 func (s *Server) handleInitialize(ctx context.Context, request *transport.BaseJSONRPCRequest, _ protocol.RequestHandlerExtra) (transport.JsonRpcBody, error) {
 	return InitializeResponse{
 		Meta:            nil,
-		Capabilities:    s.capabilities,
+		Capabilities:    s.generateCapabilities(),
 		Instructions:    s.serverInstructions,
 		ProtocolVersion: "2024-11-05",
 		ServerInfo: implementation{
@@ -692,15 +689,13 @@ func (s *Server) handleSetLoggingLevel(ctx context.Context, request *transport.B
 		params = setLoggingLevelParams{}
 	} else {
 		if err := json.Unmarshal(request.Params, &params); err != nil {
-			log.Printf("failed to unmarshal set logging level params: %v\n", err)
-			return nil, errors.Wrap(err, "failed to unmarshal arguments")
+			return nil, errors.Wrap(err, "Invalid params")
 		}
 	}
 
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if params.Level != LevelNil {
-		log.Printf("setting logging level to %s\n", level2str[params.Level])
 		s.loggingLevel = params.Level
 	}
 	return struct{}{}, nil
@@ -746,6 +741,7 @@ func (s *Server) generateCapabilities() ServerCapabilities {
 				ListChanged: &t,
 			}
 		}(),
+		Logging: s.capabilities.Logging,
 	}
 }
 func (s *Server) handleListPrompts(ctx context.Context, request *transport.BaseJSONRPCRequest, extra protocol.RequestHandlerExtra) (transport.JsonRpcBody, error) {

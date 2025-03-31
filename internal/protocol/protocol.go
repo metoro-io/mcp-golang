@@ -525,6 +525,7 @@ func (p *Protocol) Notification(method string, params interface{}) error {
 	if err != nil {
 		return fmt.Errorf("failed to marshal notification params: %w", err)
 	}
+
 	notification := &transport.BaseJSONRPCNotification{
 		Jsonrpc: "2.0",
 		Method:  method,
