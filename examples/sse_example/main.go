@@ -54,6 +54,7 @@ func (h *HttpHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			w.Write([]byte("Accepted"))
 			return
 		}
+		return
 	}
 
 	transport, err := sse.NewSSEServerTransport(postEndpoint, w)
