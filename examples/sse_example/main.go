@@ -79,6 +79,9 @@ func (h *HttpHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	sessionList[transport.SessionID()] = transport
 	sessionListLock.Unlock()
 	<-r.Context().Done()
+	sessionListLock.Lock()
+	delete(sessionList, transport.SessionID())
+	sessionListLock.Unlock()
 }
 
 func main() {
