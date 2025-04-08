@@ -97,6 +97,53 @@ func TestStdioServerTransport(t *testing.T) {
 		assert.Contains(t, out.String(), "\n")
 	})
 
+	t.Run("error message", func(t *testing.T) {
+		in := &bytes.Buffer{}
+		out := &bytes.Buffer{}
+		transport := NewStdioServerTransportWithIO(in, out)
+
+		var receivedErr error
+		var wg sync.WaitGroup
+		wg.Add(1)
+
+		transport.SetErrorHandler(func(err error) {
+			receivedErr = err
+			wg.Done()
+		})
+
+		ctx := context.Background()
+		err := transport.Start(ctx)
+		assert.NoError(t, err)
+
+		// Write invalid JSON to trigger error
+		_, err = in.Write([]byte(`{"jsonrpc":"2.0","result":{"status":"ok"}}`))
+		assert.NoError(t, err)
+
+		// Write newline to complete the message
+		_, err = in.Write([]byte("\n"))
+		assert.NoError(t, err)
+
+		// Wait for error handling with timeout
+		done := make(chan struct{})
+		go func() {
+			wg.Wait()
+			close(done)
+		}()
+
+		select {
+		case <-done:
+			// Success
+		case <-time.After(time.Second):
+			t.Fatal("timeout waiting for error")
+		}
+
+		assert.NotNil(t, receivedErr)
+		assert.Contains(t, receivedErr.Error(), "failed to unmarshal JSON-RPC message, unrecognized type")
+
+		err = transport.Close()
+		assert.NoError(t, err)
+	})
+
 	t.Run("error handling", func(t *testing.T) {
 		in := &bytes.Buffer{}
 		out := &bytes.Buffer{}
@@ -138,7 +185,7 @@ func TestStdioServerTransport(t *testing.T) {
 		}
 
 		assert.NotNil(t, receivedErr)
-		assert.Contains(t, receivedErr.Error(), "failed to unmarshal JSON-RPC message, unrecognized type")
+		assert.Contains(t, receivedErr.Error(), "failed to parse JSON: unexpected end of JSON input")
 
 		err = transport.Close()
 		assert.NoError(t, err)

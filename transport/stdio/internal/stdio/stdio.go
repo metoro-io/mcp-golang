@@ -156,6 +156,8 @@ func deserializeMessage(line string) (*transport.BaseJsonRpcMessage, error) {
 }
 
 // deserializeMessageV2 deserializes a JSON-RPC message from a string.
+// It attempts to parse the input string into different JSON-RPC message types
+// and returns the appropriate message object or an error if parsing fails.
 func deserializeMessageV2(line string) (*transport.BaseJsonRpcMessage, error) {
 	var tmp transport.JSONRPCCommon
 	if err := json.Unmarshal([]byte(line), &tmp); err != nil {
@@ -163,7 +165,7 @@ func deserializeMessageV2(line string) (*transport.BaseJsonRpcMessage, error) {
 	}
 
 	switch {
-	// 请求消息（包含 Method 和 Id）
+	// Request message (contains Method and Id)
 	case tmp.Method != "" && tmp.Id != nil:
 		request := transport.BaseJSONRPCRequest{
 			Id:      *tmp.Id,
@@ -173,7 +175,7 @@ func deserializeMessageV2(line string) (*transport.BaseJsonRpcMessage, error) {
 		}
 		return transport.NewBaseMessageRequest(&request), nil
 
-	// 通知消息（包含 Method 但不包含 Id）
+	// Notification message (contains Method but not Id)
 	case tmp.Method != "" && tmp.Id == nil:
 		notification := transport.BaseJSONRPCNotification{
 			Jsonrpc: tmp.Jsonrpc,
@@ -182,7 +184,7 @@ func deserializeMessageV2(line string) (*transport.BaseJsonRpcMessage, error) {
 		}
 		return transport.NewBaseMessageNotification(&notification), nil
 
-	// 响应消息（包含 Result 和 Id）
+	// Response message (contains Result and Id)
 	case tmp.Result != nil && tmp.Id != nil:
 		response := transport.BaseJSONRPCResponse{
 			Id:      *tmp.Id,
@@ -191,7 +193,7 @@ func deserializeMessageV2(line string) (*transport.BaseJsonRpcMessage, error) {
 		}
 		return transport.NewBaseMessageResponse(&response), nil
 
-	// 错误响应消息（包含 Error 和 Id）
+	// Error response message (contains Error and Id)
 	case tmp.Error != nil && tmp.Id != nil:
 		errorResponse := transport.BaseJSONRPCError{
 			Error:   *tmp.Error,
