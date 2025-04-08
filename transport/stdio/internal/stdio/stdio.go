@@ -60,8 +60,10 @@ package stdio
 import (
 	"encoding/json"
 	"errors"
-	"github.com/metoro-io/mcp-golang/transport"
+	"fmt"
 	"sync"
+
+	"github.com/metoro-io/mcp-golang/transport"
 )
 
 // ReadBuffer buffers a continuous stdio stream into discrete JSON-RPC messages.
@@ -102,9 +104,9 @@ func (rb *ReadBuffer) ReadMessage() (*transport.BaseJsonRpcMessage, error) {
 		if rb.buffer[i] == '\n' {
 			// Extract line
 			line := string(rb.buffer[:i])
-			//println("read line: ", line)
+			// println("read line: ", line)
 			rb.buffer = rb.buffer[i+1:]
-			return deserializeMessage(line)
+			return deserializeMessageV2(line)
 		}
 	}
 
@@ -122,33 +124,83 @@ func (rb *ReadBuffer) Clear() {
 func deserializeMessage(line string) (*transport.BaseJsonRpcMessage, error) {
 	var request transport.BaseJSONRPCRequest
 	if err := json.Unmarshal([]byte(line), &request); err == nil {
-		//println("unmarshaled request:", spew.Sdump(request))
+		// println("unmarshaled request:", spew.Sdump(request))
 		return transport.NewBaseMessageRequest(&request), nil
 	} else {
-		//println("unmarshaled request error:", err.Error())
+		// println("unmarshaled request error:", err.Error())
 	}
 
 	var notification transport.BaseJSONRPCNotification
 	if err := json.Unmarshal([]byte(line), &notification); err == nil {
 		return transport.NewBaseMessageNotification(&notification), nil
 	} else {
-		//println("unmarshaled notification error:", err.Error())
+		// println("unmarshaled notification error:", err.Error())
 	}
 
 	var response transport.BaseJSONRPCResponse
 	if err := json.Unmarshal([]byte(line), &response); err == nil {
 		return transport.NewBaseMessageResponse(&response), nil
 	} else {
-		//println("unmarshaled response error:", err.Error())
+		// println("unmarshaled response error:", err.Error())
 	}
 
 	var errorResponse transport.BaseJSONRPCError
 	if err := json.Unmarshal([]byte(line), &errorResponse); err == nil {
 		return transport.NewBaseMessageError(&errorResponse), nil
 	} else {
-		//println("unmarshaled error response error:", err.Error())
+		// println("unmarshaled error response error:", err.Error())
 	}
 
 	// Must be a response
 	return nil, errors.New("failed to unmarshal JSON-RPC message, unrecognized type")
+}
+
+// deserializeMessageV2 deserializes a JSON-RPC message from a string.
+func deserializeMessageV2(line string) (*transport.BaseJsonRpcMessage, error) {
+	var tmp transport.JSONRPCCommon
+	if err := json.Unmarshal([]byte(line), &tmp); err != nil {
+		return nil, fmt.Errorf("failed to parse JSON: %w", err)
+	}
+
+	switch {
+	// 请求消息（包含 Method 和 Id）
+	case tmp.Method != "" && tmp.Id != nil:
+		request := transport.BaseJSONRPCRequest{
+			Id:      *tmp.Id,
+			Jsonrpc: tmp.Jsonrpc,
+			Method:  tmp.Method,
+			Params:  tmp.Params,
+		}
+		return transport.NewBaseMessageRequest(&request), nil
+
+	// 通知消息（包含 Method 但不包含 Id）
+	case tmp.Method != "" && tmp.Id == nil:
+		notification := transport.BaseJSONRPCNotification{
+			Jsonrpc: tmp.Jsonrpc,
+			Method:  tmp.Method,
+			Params:  tmp.Params,
+		}
+		return transport.NewBaseMessageNotification(&notification), nil
+
+	// 响应消息（包含 Result 和 Id）
+	case tmp.Result != nil && tmp.Id != nil:
+		response := transport.BaseJSONRPCResponse{
+			Id:      *tmp.Id,
+			Jsonrpc: tmp.Jsonrpc,
+			Result:  tmp.Result,
+		}
+		return transport.NewBaseMessageResponse(&response), nil
+
+	// 错误响应消息（包含 Error 和 Id）
+	case tmp.Error != nil && tmp.Id != nil:
+		errorResponse := transport.BaseJSONRPCError{
+			Error:   *tmp.Error,
+			Id:      *tmp.Id,
+			Jsonrpc: tmp.Jsonrpc,
+		}
+		return transport.NewBaseMessageError(&errorResponse), nil
+
+	default:
+		return nil, errors.New("failed to unmarshal JSON-RPC message, unrecognized type")
+	}
 }
