@@ -95,6 +95,29 @@ func (c EmbeddedResource) MarshalJSON() ([]byte, error) {
 	}
 }
 
+// Custom JSON unmarshaling for EmbeddedResource
+func (c *EmbeddedResource) UnmarshalJSON(data []byte) error {
+	// First try to unmarshal as TextResourceContents
+	var textResource TextResourceContents
+	err := json.Unmarshal(data, &textResource)
+	if err == nil && textResource.Text != "" {
+		c.EmbeddedResourceType = embeddedResourceTypeText
+		c.TextResourceContents = &textResource
+		return nil
+	}
+
+	// Then try to unmarshal as BlobResourceContents
+	var blobResource BlobResourceContents
+	err = json.Unmarshal(data, &blobResource)
+	if err == nil && blobResource.Blob != "" {
+		c.EmbeddedResourceType = embeddedResourceTypeBlob
+		c.BlobResourceContents = &blobResource
+		return nil
+	}
+
+	return fmt.Errorf("failed to unmarshal embedded resource: %v", err)
+}
+
 type ContentType string
 
 const (

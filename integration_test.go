@@ -6,16 +6,21 @@ package mcp_golang
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
+	"net"
+	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"testing"
 	"time"
 
+	"github.com/metoro-io/mcp-golang/internal/protocol"
 	"github.com/metoro-io/mcp-golang/transport"
+	mcphttp "github.com/metoro-io/mcp-golang/transport/http"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -219,4 +224,133 @@ func TestServerIntegration(t *testing.T) {
 	result := resp["result"].(map[string]interface{})
 	content := result["content"].([]interface{})[0].(map[string]interface{})
 	assert.Equal(t, "Hello, World!", content["text"])
+}
+
+func TestReadResource(t *testing.T) {
+	// Skip in short mode
+	if testing.Short() {
+		t.Skip("skipping in short mode")
+	}
+
+	uri := "test://example"
+	resourceText := `{"app_name":"MyExampleServer","version":"1.0.0"}`
+	mimeType := "application/json"
+
+	// Start server on a random port
+	server, addr := startTestServerWithResource(t, uri, resourceText, mimeType)
+	defer server.Close()
+
+	// Create HTTP client transport
+	clientTransport := mcphttp.NewHTTPClientTransport("/mcp")
+	clientTransport.WithBaseURL(fmt.Sprintf("http://%s", addr))
+
+	// Create client
+	client := NewClient(clientTransport)
+
+	// Initialize
+	_, err := client.Initialize(context.Background())
+	assert.NoError(t, err)
+
+	// Call ReadResource
+	response, err := client.ReadResource(context.Background(), uri)
+
+	// Verify results
+	assert.NoError(t, err)
+	assert.NotNil(t, response)
+	assert.Equal(t, 1, len(response.Contents))
+	assert.NotNil(t, response.Contents[0].TextResourceContents)
+	assert.Equal(t, uri, response.Contents[0].TextResourceContents.Uri)
+	assert.Equal(t, resourceText, response.Contents[0].TextResourceContents.Text)
+}
+
+// Helper function to start a test server with a resource
+func startTestServerWithResource(t *testing.T, uri, text, mimeType string) (*http.Server, string) {
+	// Create HTTP transport
+	serverTransport := mcphttp.NewHTTPTransport("/mcp")
+
+	// Create temporary server
+	tempAddr := "localhost:0" // Let the OS choose a free port
+	serverTransport.WithAddr(tempAddr)
+
+	// Create server and register the resource
+	server := NewServer(serverTransport)
+
+	err := server.RegisterResource(
+		uri,
+		"example",
+		"Example resource for testing",
+		mimeType,
+		func() (*ResourceResponse, error) {
+			embeddedResource := NewTextEmbeddedResource(uri, text, mimeType)
+			return NewResourceResponse(embeddedResource), nil
+		},
+	)
+	assert.NoError(t, err)
+
+	// Start an HTTP server to handle the actual traffic
+	mux := http.NewServeMux()
+	httpServer := &http.Server{Handler: mux}
+
+	listener, err := net.Listen("tcp", tempAddr)
+	assert.NoError(t, err)
+
+	// Create a handler that forwards requests to our server
+	mux.HandleFunc("/mcp", func(w http.ResponseWriter, r *http.Request) {
+		body, err := io.ReadAll(r.Body)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		// Parse the request
+		var request transport.BaseJSONRPCRequest
+		err = json.Unmarshal(body, &request)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+
+		// Process the request with our server
+		ctx := context.Background()
+		switch request.Method {
+		case "initialize":
+			result, err := server.handleInitialize(ctx, &request, protocol.RequestHandlerExtra{})
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+			writeJSONResponse(w, request.Id, result)
+		case "resources/read":
+			result, err := server.handleResourceCalls(ctx, &request, protocol.RequestHandlerExtra{})
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+			writeJSONResponse(w, request.Id, result)
+		default:
+			http.Error(w, "Method not supported", http.StatusBadRequest)
+		}
+	})
+
+	// Start server in a goroutine
+	go func() {
+		if err := httpServer.Serve(listener); err != nil && err != http.ErrServerClosed {
+			t.Logf("HTTP server error: %v", err)
+		}
+	}()
+
+	// Return the server and the actual address it's listening on
+	return httpServer, listener.Addr().String()
+}
+
+func writeJSONResponse(w http.ResponseWriter, id interface{}, result interface{}) {
+	w.Header().Set("Content-Type", "application/json")
+
+	response := map[string]interface{}{
+		"jsonrpc": "2.0",
+		"id":      id,
+		"result":  result,
+	}
+
+	json.NewEncoder(w).Encode(response)
 }

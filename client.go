@@ -254,17 +254,13 @@ func (c *Client) ReadResource(ctx context.Context, uri string) (*ResourceRespons
 		return nil, errors.New("invalid response type")
 	}
 
-	var resourceResponse resourceResponseSent
+	var resourceResponse ResourceResponse
 	err = json.Unmarshal(responseBytes, &resourceResponse)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to unmarshal resource response")
 	}
 
-	if resourceResponse.Error != nil {
-		return nil, resourceResponse.Error
-	}
-
-	return resourceResponse.Response, nil
+	return &resourceResponse, nil
 }
 
 // Ping sends a ping request to the server to check connectivity
