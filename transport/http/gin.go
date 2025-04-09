@@ -7,7 +7,6 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
-	"github.com/metoro-io/mcp-golang/transport"
 )
 
 // GinTransport implements a stateless HTTP transport for MCP using Gin
@@ -27,44 +26,10 @@ func (t *GinTransport) Start(ctx context.Context) error {
 	return nil
 }
 
-// Send implements Transport.Send
-func (t *GinTransport) Send(ctx context.Context, message *transport.BaseJsonRpcMessage) error {
-	key := message.JsonRpcResponse.Id
-	responseChannel := t.responseMap[int64(key)]
-	if responseChannel == nil {
-		return fmt.Errorf("no response channel found for key: %d", key)
-	}
-	responseChannel <- message
-	return nil
-}
-
 // Close implements Transport.Close
 func (t *GinTransport) Close() error {
-	if t.closeHandler != nil {
-		t.closeHandler()
-	}
+	t.baseTransport.Close()
 	return nil
-}
-
-// SetCloseHandler implements Transport.SetCloseHandler
-func (t *GinTransport) SetCloseHandler(handler func()) {
-	t.mu.Lock()
-	defer t.mu.Unlock()
-	t.closeHandler = handler
-}
-
-// SetErrorHandler implements Transport.SetErrorHandler
-func (t *GinTransport) SetErrorHandler(handler func(error)) {
-	t.mu.Lock()
-	defer t.mu.Unlock()
-	t.errorHandler = handler
-}
-
-// SetMessageHandler implements Transport.SetMessageHandler
-func (t *GinTransport) SetMessageHandler(handler func(ctx context.Context, message *transport.BaseJsonRpcMessage)) {
-	t.mu.Lock()
-	defer t.mu.Unlock()
-	t.messageHandler = handler
 }
 
 // Handler returns a Gin handler function that can be used with Gin's router
