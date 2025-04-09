@@ -10,25 +10,25 @@ import (
 	"github.com/metoro-io/mcp-golang/transport"
 )
 
-// baseTransport implements the common functionality for HTTP-based transports
-type baseTransport struct {
-	messageHandler func(ctx context.Context, message *transport.BaseJsonRpcMessage)
-	errorHandler   func(error)
-	closeHandler   func()
+// BaseTransport implements the common functionality for HTTP-based transports
+type BaseTransport struct {
+	MessageHandler func(ctx context.Context, message *transport.BaseJsonRpcMessage)
+	ErrorHandler   func(error)
+	CloseHandler   func()
 	mu             sync.RWMutex
-	responseMap    map[int64]chan *transport.BaseJsonRpcMessage
+	ResponseMap    map[int64]chan *transport.BaseJsonRpcMessage
 }
 
-func newBaseTransport() *baseTransport {
-	return &baseTransport{
-		responseMap: make(map[int64]chan *transport.BaseJsonRpcMessage),
+func NewBaseTransport() *BaseTransport {
+	return &BaseTransport{
+		ResponseMap: make(map[int64]chan *transport.BaseJsonRpcMessage),
 	}
 }
 
 // Send implements Transport.Send
-func (t *baseTransport) Send(ctx context.Context, message *transport.BaseJsonRpcMessage) error {
+func (t *BaseTransport) Send(ctx context.Context, message *transport.BaseJsonRpcMessage) error {
 	key := message.JsonRpcResponse.Id
-	responseChannel := t.responseMap[int64(key)]
+	responseChannel := t.ResponseMap[int64(key)]
 	if responseChannel == nil {
 		return fmt.Errorf("no response channel found for key: %d", key)
 	}
@@ -37,47 +37,47 @@ func (t *baseTransport) Send(ctx context.Context, message *transport.BaseJsonRpc
 }
 
 // Close implements Transport.Close
-func (t *baseTransport) Close() error {
-	if t.closeHandler != nil {
-		t.closeHandler()
+func (t *BaseTransport) Close() error {
+	if t.CloseHandler != nil {
+		t.CloseHandler()
 	}
 	return nil
 }
 
 // SetCloseHandler implements Transport.SetCloseHandler
-func (t *baseTransport) SetCloseHandler(handler func()) {
+func (t *BaseTransport) SetCloseHandler(handler func()) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
-	t.closeHandler = handler
+	t.CloseHandler = handler
 }
 
 // SetErrorHandler implements Transport.SetErrorHandler
-func (t *baseTransport) SetErrorHandler(handler func(error)) {
+func (t *BaseTransport) SetErrorHandler(handler func(error)) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
-	t.errorHandler = handler
+	t.ErrorHandler = handler
 }
 
 // SetMessageHandler implements Transport.SetMessageHandler
-func (t *baseTransport) SetMessageHandler(handler func(ctx context.Context, message *transport.BaseJsonRpcMessage)) {
+func (t *BaseTransport) SetMessageHandler(handler func(ctx context.Context, message *transport.BaseJsonRpcMessage)) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
-	t.messageHandler = handler
+	t.MessageHandler = handler
 }
 
-// handleMessage processes an incoming message and returns a response
-func (t *baseTransport) handleMessage(ctx context.Context, body []byte) (*transport.BaseJsonRpcMessage, error) {
+// HandleMessage processes an incoming message and returns a response
+func (t *BaseTransport) HandleMessage(ctx context.Context, body []byte) (*transport.BaseJsonRpcMessage, error) {
 	// Store the response writer for later use
 	t.mu.Lock()
 	var key int64 = 0
 
 	for key < 1000000 {
-		if _, ok := t.responseMap[key]; !ok {
+		if _, ok := t.ResponseMap[key]; !ok {
 			break
 		}
 		key = key + 1
 	}
-	t.responseMap[key] = make(chan *transport.BaseJsonRpcMessage)
+	t.ResponseMap[key] = make(chan *transport.BaseJsonRpcMessage)
 	t.mu.Unlock()
 
 	var prevId *transport.RequestId = nil
@@ -90,7 +90,7 @@ func (t *baseTransport) handleMessage(ctx context.Context, body []byte) (*transp
 		prevId = &id
 		request.Id = transport.RequestId(key)
 		t.mu.RLock()
-		handler := t.messageHandler
+		handler := t.MessageHandler
 		t.mu.RUnlock()
 
 		if handler != nil {
@@ -104,7 +104,7 @@ func (t *baseTransport) handleMessage(ctx context.Context, body []byte) (*transp
 		if err := json.Unmarshal(body, &notification); err == nil {
 			deserialized = true
 			t.mu.RLock()
-			handler := t.messageHandler
+			handler := t.MessageHandler
 			t.mu.RUnlock()
 
 			if handler != nil {
@@ -119,7 +119,7 @@ func (t *baseTransport) handleMessage(ctx context.Context, body []byte) (*transp
 		if err := json.Unmarshal(body, &response); err == nil {
 			deserialized = true
 			t.mu.RLock()
-			handler := t.messageHandler
+			handler := t.MessageHandler
 			t.mu.RUnlock()
 
 			if handler != nil {
@@ -134,7 +134,7 @@ func (t *baseTransport) handleMessage(ctx context.Context, body []byte) (*transp
 		if err := json.Unmarshal(body, &errorResponse); err == nil {
 			deserialized = true
 			t.mu.RLock()
-			handler := t.messageHandler
+			handler := t.MessageHandler
 			t.mu.RUnlock()
 
 			if handler != nil {
@@ -144,8 +144,8 @@ func (t *baseTransport) handleMessage(ctx context.Context, body []byte) (*transp
 	}
 
 	// Block until the response is received
-	responseToUse := <-t.responseMap[key]
-	delete(t.responseMap, key)
+	responseToUse := <-t.ResponseMap[key]
+	delete(t.ResponseMap, key)
 	if prevId != nil {
 		responseToUse.JsonRpcResponse.Id = *prevId
 	}
@@ -153,12 +153,12 @@ func (t *baseTransport) handleMessage(ctx context.Context, body []byte) (*transp
 	return responseToUse, nil
 }
 
-// readBody reads and returns the body from an io.Reader
-func (t *baseTransport) readBody(reader io.Reader) ([]byte, error) {
+// ReadBody reads and returns the body from an io.Reader
+func (t *BaseTransport) ReadBody(reader io.Reader) ([]byte, error) {
 	body, err := io.ReadAll(reader)
 	if err != nil {
-		if t.errorHandler != nil {
-			t.errorHandler(fmt.Errorf("failed to read request body: %w", err))
+		if t.ErrorHandler != nil {
+			t.ErrorHandler(fmt.Errorf("failed to read request body: %w", err))
 		}
 		return nil, fmt.Errorf("failed to read request body: %w", err)
 	}
