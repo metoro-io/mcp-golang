@@ -2,7 +2,8 @@ package main
 
 import (
 	"fmt"
-	"github.com/metoro-io/mcp-golang"
+
+	mcp_golang "github.com/metoro-io/mcp-golang"
 	"github.com/metoro-io/mcp-golang/transport/stdio"
 )
 
@@ -38,6 +39,9 @@ func main() {
 	err = server.RegisterResource("test://resource", "resource_test", "This is a test resource", "application/json", func() (*mcp_golang.ResourceResponse, error) {
 		return mcp_golang.NewResourceResponse(mcp_golang.NewTextEmbeddedResource("test://resource", "This is a test resource", "application/json")), nil
 	})
+	if err != nil {
+		panic(err)
+	}
 
 	err = server.Serve()
 	if err != nil {
