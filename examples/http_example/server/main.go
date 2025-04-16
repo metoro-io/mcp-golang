@@ -18,7 +18,12 @@ func main() {
 	transport := http.NewHTTPTransport("/mcp").WithAddr(":8081")
 
 	// Create a new server with the transport
-	server := mcp_golang.NewServer(transport, mcp_golang.WithName("mcp-golang-stateless-http-example"), mcp_golang.WithVersion("0.0.1"))
+	server := mcp_golang.NewServer(
+		transport,
+		mcp_golang.WithName("mcp-golang-stateless-http-example"),
+		mcp_golang.WithInstructions("A simple example of a stateless HTTP server using mcp-golang"),
+		mcp_golang.WithVersion("0.0.1"),
+	)
 
 	// Register a simple tool
 	err := server.RegisterTool("time", "Returns the current time in the specified format", func(args TimeArgs) (*mcp_golang.ToolResponse, error) {
