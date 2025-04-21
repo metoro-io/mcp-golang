@@ -3,6 +3,8 @@ package mcp_golang
 import (
 	"encoding/json"
 	"fmt"
+
+	"github.com/invopop/jsonschema"
 )
 
 // Capabilities that a server may support. Known capabilities are defined here, in
@@ -151,7 +153,7 @@ type ToolRetType struct {
 	Description *string `json:"description,omitempty" yaml:"description,omitempty" mapstructure:"description,omitempty"`
 
 	// A JSON Schema object defining the expected parameters for the tool.
-	InputSchema interface{} `json:"inputSchema" yaml:"inputSchema" mapstructure:"inputSchema"`
+	InputSchema *jsonschema.Schema `json:"inputSchema" yaml:"inputSchema" mapstructure:"inputSchema"`
 
 	// The name of the tool.
 	Name string `json:"name" yaml:"name" mapstructure:"name"`
