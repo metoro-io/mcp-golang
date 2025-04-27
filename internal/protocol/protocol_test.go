@@ -201,6 +201,51 @@ func TestProtocol_RequestHandler(t *testing.T) {
 	}
 }
 
+func TestProtocol_RequestHandler_ErrorResponse(t *testing.T) {
+	p := NewProtocol(nil)
+	tr := testingutils.NewMockTransport()
+
+	if err := p.Connect(tr); err != nil {
+		t.Fatalf("Connect failed: %v", err)
+	}
+
+	// Register request handler
+	handlerCalled := false
+	p.SetRequestHandler("test_method", func(ctx context.Context, req *transport.BaseJSONRPCRequest, extra RequestHandlerExtra) (transport.JsonRpcBody, error) {
+		handlerCalled = true
+		return nil, errors.New("sample error")
+	})
+
+	// Simulate incoming request
+	tr.SimulateMessage(transport.NewBaseMessageRequest(&transport.BaseJSONRPCRequest{
+		Jsonrpc: "2.0",
+		Method:  "test_method",
+		Params:  json.RawMessage(`{"param": "value"}`),
+	}))
+
+	// Give some time for handler to be called
+	time.Sleep(50 * time.Millisecond)
+
+	if !handlerCalled {
+		t.Error("Request handler was not called")
+	}
+
+	// Check response
+	msgs := tr.GetMessages()
+	if len(msgs) != 1 {
+		t.Fatalf("Expected 1 message, got %d", len(msgs))
+	}
+
+	response := msgs[0]
+	if response.Type != transport.BaseMessageTypeJSONRPCErrorType {
+		t.Fatal("Message is not a response")
+	}
+
+	if string(response.JsonRpcError.Error.Message) != "sample error" {
+		t.Errorf("Expected result 'sample error', got %v", string(response.JsonRpcError.Error.Message))
+	}
+}
+
 // TestProtocol_NotificationHandler tests the handling of incoming notifications.
 // This is important for asynchronous events and status updates.
 // It verifies:
