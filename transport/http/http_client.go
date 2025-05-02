@@ -12,6 +12,10 @@ import (
 	"github.com/metoro-io/mcp-golang/transport"
 )
 
+type HTTPClient interface {
+	Do(r *http.Request) (*http.Response, error)
+}
+
 // HTTPClientTransport implements a client-side HTTP transport for MCP
 type HTTPClientTransport struct {
 	baseURL        string
@@ -20,7 +24,7 @@ type HTTPClientTransport struct {
 	errorHandler   func(error)
 	closeHandler   func()
 	mu             sync.RWMutex
-	client         *http.Client
+	client         HTTPClient
 	headers        map[string]string
 }
 
@@ -31,6 +35,12 @@ func NewHTTPClientTransport(endpoint string) *HTTPClientTransport {
 		client:   &http.Client{},
 		headers:  make(map[string]string),
 	}
+}
+
+// WithClient allows to set a custom HTTP client
+func (t *HTTPClientTransport) WithClient(c HTTPClient) *HTTPClientTransport {
+	t.client = c
+	return t
 }
 
 // WithBaseURL sets the base URL to connect to
