@@ -427,7 +427,13 @@ func createWrappedPromptHandler(userHandler any) func(context.Context, baseGetPr
 func createPromptSchemaFromHandler(handler any) *PromptSchema {
 	handlerValue := reflect.ValueOf(handler)
 	handlerType := handlerValue.Type()
-	argumentType := handlerType.In(0)
+
+	var argumentType reflect.Type
+	if handlerType.NumIn() == 2 {
+		argumentType = handlerType.In(1)
+	} else if handlerType.NumIn() == 1 {
+		argumentType = handlerType.In(0)
+	}
 
 	promptSchema := PromptSchema{
 		Arguments: make([]PromptSchemaArgument, argumentType.NumField()),
