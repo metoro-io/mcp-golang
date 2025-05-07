@@ -45,12 +45,6 @@ func (t *HTTPClientTransport) WithHeader(key, value string) *HTTPClientTransport
 	return t
 }
 
-// WithClient sets the HTTP client to use for requests
-func (t *HTTPClientTransport) WithClient(client *http.Client) *HTTPClientTransport {
-	t.client = client
-	return t
-}
-
 // Start implements Transport.Start
 func (t *HTTPClientTransport) Start(ctx context.Context) error {
 	// Does nothing in the stateless http client transport
