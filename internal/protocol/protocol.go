@@ -344,7 +344,7 @@ func (p *Protocol) handleCancelledNotification(notification *transport.BaseJSONR
 }
 
 func (p *Protocol) handleResponse(response *transport.BaseJSONRPCResponse, errResp *transport.BaseJSONRPCError) {
-	var id = response.Id
+	var id transport.RequestId
 	var result interface{}
 	var err error
 
@@ -354,6 +354,7 @@ func (p *Protocol) handleResponse(response *transport.BaseJSONRPCResponse, errRe
 	} else {
 		// Parse the response
 		result = response.Result
+		id = response.Id
 	}
 
 	p.mu.RLock()
