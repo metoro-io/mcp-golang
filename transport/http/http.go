@@ -12,7 +12,7 @@ import (
 
 // HTTPTransport implements a stateless HTTP transport for MCP
 type HTTPTransport struct {
-	*baseTransport
+	*BaseTransport
 	server         *http.Server
 	endpoint       string
 	messageHandler func(ctx context.Context, message *transport.BaseJsonRpcMessage)
@@ -25,7 +25,7 @@ type HTTPTransport struct {
 // NewHTTPTransport creates a new HTTP transport that listens on the specified endpoint
 func NewHTTPTransport(endpoint string) *HTTPTransport {
 	return &HTTPTransport{
-		baseTransport: newBaseTransport(),
+		BaseTransport: NewBaseTransport(),
 		endpoint:      endpoint,
 		addr:          ":8080", // Default port
 	}
@@ -116,13 +116,13 @@ func (t *HTTPTransport) handleRequest(w http.ResponseWriter, r *http.Request) {
 	}
 
 	ctx := r.Context()
-	body, err := t.readBody(r.Body)
+	body, err := t.ReadBody(r.Body)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
-	response, err := t.handleMessage(ctx, body)
+	response, err := t.HandleMessage(ctx, body)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
