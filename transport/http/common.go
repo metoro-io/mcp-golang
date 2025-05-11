@@ -67,28 +67,42 @@ func (t *baseTransport) SetMessageHandler(handler func(ctx context.Context, mess
 
 // handleMessage processes an incoming message and returns a response
 func (t *baseTransport) handleMessage(ctx context.Context, body []byte) (*transport.BaseJsonRpcMessage, error) {
-	// Store the response writer for later use
+	// Lock mutex to store the response writer for later use
 	t.mu.Lock()
 	var key int64 = 0
 
+	// Find an unused key in the response map
 	for key < 1000000 {
 		if _, ok := t.responseMap[key]; !ok {
 			break
 		}
-		key = key + 1
+		key++
 	}
 	t.responseMap[key] = make(chan *transport.BaseJsonRpcMessage)
 	t.mu.Unlock()
 
 	var prevId *transport.RequestId = nil
-	deserialized := false
-	// Try to unmarshal as a request first
-	var request transport.BaseJSONRPCRequest
-	if err := json.Unmarshal(body, &request); err == nil {
-		deserialized = true
-		id := request.Id
-		prevId = &id
-		request.Id = transport.RequestId(key)
+	var tmp transport.JSONRPCCommon
+	if err := json.Unmarshal(body, &tmp); err != nil {
+		return nil, fmt.Errorf("failed to parse JSON: %w", err)
+	}
+
+	// Process the message based on its type
+	switch {
+	// Request message (contains Method and Id)
+	case tmp.Method != "" && tmp.Id != nil:
+		// Modify the request Id to the key
+		originalId := *tmp.Id
+		*tmp.Id = transport.RequestId(key)
+
+		request := transport.BaseJSONRPCRequest{
+			Id:      *tmp.Id,
+			Jsonrpc: tmp.Jsonrpc,
+			Method:  tmp.Method,
+			Params:  tmp.Params,
+		}
+
+		// Call the message handler
 		t.mu.RLock()
 		handler := t.messageHandler
 		t.mu.RUnlock()
@@ -96,61 +110,86 @@ func (t *baseTransport) handleMessage(ctx context.Context, body []byte) (*transp
 		if handler != nil {
 			handler(ctx, transport.NewBaseMessageRequest(&request))
 		}
-	}
 
-	// Try as a notification
-	var notification transport.BaseJSONRPCNotification
-	if !deserialized {
-		if err := json.Unmarshal(body, &notification); err == nil {
-			deserialized = true
-			t.mu.RLock()
-			handler := t.messageHandler
-			t.mu.RUnlock()
+		// Set prevId to restore the original Id in the response
+		prevId = &originalId
 
-			if handler != nil {
-				handler(ctx, transport.NewBaseMessageNotification(&notification))
-			}
+	// Notification message (contains Method but no Id)
+	case tmp.Method != "" && tmp.Id == nil:
+		notification := transport.BaseJSONRPCNotification{
+			Jsonrpc: tmp.Jsonrpc,
+			Method:  tmp.Method,
+			Params:  tmp.Params,
 		}
-	}
 
-	// Try as a response
-	var response transport.BaseJSONRPCResponse
-	if !deserialized {
-		if err := json.Unmarshal(body, &response); err == nil {
-			deserialized = true
-			t.mu.RLock()
-			handler := t.messageHandler
-			t.mu.RUnlock()
+		// Call the message handler
+		t.mu.RLock()
+		handler := t.messageHandler
+		t.mu.RUnlock()
 
-			if handler != nil {
-				handler(ctx, transport.NewBaseMessageResponse(&response))
-			}
+		if handler != nil {
+			handler(ctx, transport.NewBaseMessageNotification(&notification))
 		}
-	}
 
-	// Try as an error
-	var errorResponse transport.BaseJSONRPCError
-	if !deserialized {
-		if err := json.Unmarshal(body, &errorResponse); err == nil {
-			deserialized = true
-			t.mu.RLock()
-			handler := t.messageHandler
-			t.mu.RUnlock()
-
-			if handler != nil {
-				handler(ctx, transport.NewBaseMessageError(&errorResponse))
-			}
+	// Response message (contains Result and Id)
+	case tmp.Result != nil && tmp.Id != nil:
+		response := transport.BaseJSONRPCResponse{
+			Id:      *tmp.Id,
+			Jsonrpc: tmp.Jsonrpc,
+			Result:  tmp.Result,
 		}
+
+		// Send response to the corresponding response channel
+		t.mu.RLock()
+		responseChan, exists := t.responseMap[int64(*tmp.Id)]
+		t.mu.RUnlock()
+		if exists {
+			responseMsg := transport.NewBaseMessageResponse(&response)
+			responseChan <- responseMsg
+		} else {
+			return nil, fmt.Errorf("no matching request for response with id %d", *tmp.Id)
+		}
+
+	// Error response message (contains Error and Id)
+	case tmp.Error != nil && tmp.Id != nil:
+		errorResponse := transport.BaseJSONRPCError{
+			Error:   *tmp.Error,
+			Id:      *tmp.Id,
+			Jsonrpc: tmp.Jsonrpc,
+		}
+
+		// Send error response to the corresponding response channel
+		t.mu.RLock()
+		responseChan, exists := t.responseMap[int64(*tmp.Id)]
+		t.mu.RUnlock()
+		if exists {
+			responseMsg := transport.NewBaseMessageError(&errorResponse)
+			responseChan <- responseMsg
+		} else {
+			return nil, fmt.Errorf("no matching request for error response with id %d", *tmp.Id)
+		}
+
+	default:
+		return nil, fmt.Errorf("failed to unmarshal JSON-RPC message, unrecognized type")
 	}
 
-	// Block until the response is received
-	responseToUse := <-t.responseMap[key]
-	delete(t.responseMap, key)
+	// If it's a request message, wait for the response from the handler
 	if prevId != nil {
-		responseToUse.JsonRpcResponse.Id = *prevId
+		responseToUse := <-t.responseMap[key]
+		t.mu.Lock()
+		delete(t.responseMap, key)
+		t.mu.Unlock()
+
+		// Restore the original Id in the response
+		if responseToUse != nil && responseToUse.JsonRpcResponse != nil {
+			responseToUse.JsonRpcResponse.Id = *prevId
+		}
+
+		return responseToUse, nil
 	}
 
-	return responseToUse, nil
+	// For notifications, responses, and error responses, no need to wait for a return
+	return nil, nil
 }
 
 // readBody reads and returns the body from an io.Reader
