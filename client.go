@@ -15,6 +15,7 @@ type Client struct {
 	protocol     *protocol.Protocol
 	capabilities *ServerCapabilities
 	initialized  bool
+	info         ClientInfo
 }
 
 // NewClient creates a new MCP client with the specified transport
@@ -22,6 +23,20 @@ func NewClient(transport transport.Transport) *Client {
 	return &Client{
 		transport: transport,
 		protocol:  protocol.NewProtocol(nil),
+	}
+}
+
+type ClientInfo struct {
+	Name    string `json:"name"`
+	Version string `json:"version"`
+}
+
+// NewClientWithInfo create a new client with info. This is required by anthorpic mcp tools
+func NewClientWithInfo(transport transport.Transport, info ClientInfo) *Client {
+	return &Client{
+		transport: transport,
+		protocol:  protocol.NewProtocol(nil),
+		info:      info,
 	}
 }
 
@@ -37,7 +52,11 @@ func (c *Client) Initialize(ctx context.Context) (*InitializeResponse, error) {
 	}
 
 	// Make initialize request to server
-	response, err := c.protocol.Request(ctx, "initialize", map[string]interface{}{}, nil)
+	response, err := c.protocol.Request(ctx, "initialize", map[string]interface{}{
+		"protocolVersion": "1.0",
+		"capabilities":    map[string]interface{}{},
+		"clientInfo":      c.info,
+	}, nil)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to initialize")
 	}

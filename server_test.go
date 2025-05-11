@@ -572,3 +572,137 @@ func TestHandleListResourcesPagination(t *testing.T) {
 		t.Error("Expected no next cursor when pagination is disabled")
 	}
 }
+
+func TestHandleListResourceTemplatesPagination(t *testing.T) {
+	mockTransport := testingutils.NewMockTransport()
+	server := NewServer(mockTransport)
+	err := server.Serve()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Register templates in a non alphabetical order
+	templateURIs := []string{
+		"b://{param}/resource",
+		"a://{param}/resource",
+		"c://{param}/resource",
+		"e://{param}/resource",
+		"d://{param}/resource",
+	}
+	for _, uri := range templateURIs {
+		err = server.RegisterResourceTemplate(
+			uri,
+			"template-"+uri,
+			"Test template "+uri,
+			"text/plain",
+		)
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	// Set pagination limit to 2 items per page
+	limit := 2
+	server.paginationLimit = &limit
+
+	// Test first page (no cursor)
+	resp, err := server.handleListResourceTemplates(context.Background(), &transport.BaseJSONRPCRequest{
+		Params: []byte(`{}`),
+	}, protocol.RequestHandlerExtra{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	templatesResp, ok := resp.(ListResourceTemplatesResponse)
+	if !ok {
+		t.Fatal("Expected ListResourceTemplatesResponse")
+	}
+
+	// Verify first page
+	if len(templatesResp.Templates) != 2 {
+		t.Errorf("Expected 2 templates, got %d", len(templatesResp.Templates))
+	}
+	if templatesResp.Templates[0].UriTemplate != "a://{param}/resource" || templatesResp.Templates[1].UriTemplate != "b://{param}/resource" {
+		t.Errorf("Unexpected templates in first page: %v", templatesResp.Templates)
+	}
+	if templatesResp.NextCursor == nil {
+		t.Fatal("Expected next cursor for first page")
+	}
+
+	// Test second page
+	resp, err = server.handleListResourceTemplates(context.Background(), &transport.BaseJSONRPCRequest{
+		Params: []byte(`{"cursor":"` + *templatesResp.NextCursor + `"}`),
+	}, protocol.RequestHandlerExtra{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	templatesResp, ok = resp.(ListResourceTemplatesResponse)
+	if !ok {
+		t.Fatal("Expected ListResourceTemplatesResponse")
+	}
+
+	// Verify second page
+	if len(templatesResp.Templates) != 2 {
+		t.Errorf("Expected 2 templates, got %d", len(templatesResp.Templates))
+	}
+	if templatesResp.Templates[0].UriTemplate != "c://{param}/resource" || templatesResp.Templates[1].UriTemplate != "d://{param}/resource" {
+		t.Errorf("Unexpected templates in second page: %v", templatesResp.Templates)
+	}
+	if templatesResp.NextCursor == nil {
+		t.Fatal("Expected next cursor for second page")
+	}
+
+	// Test last page
+	resp, err = server.handleListResourceTemplates(context.Background(), &transport.BaseJSONRPCRequest{
+		Params: []byte(`{"cursor":"` + *templatesResp.NextCursor + `"}`),
+	}, protocol.RequestHandlerExtra{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	templatesResp, ok = resp.(ListResourceTemplatesResponse)
+	if !ok {
+		t.Fatal("Expected ListResourceTemplatesResponse")
+	}
+
+	// Verify last page
+	if len(templatesResp.Templates) != 1 {
+		t.Errorf("Expected 1 template, got %d", len(templatesResp.Templates))
+	}
+	if templatesResp.Templates[0].UriTemplate != "e://{param}/resource" {
+		t.Errorf("Unexpected template in last page: %v", templatesResp.Templates)
+	}
+	if templatesResp.NextCursor != nil {
+		t.Error("Expected no next cursor for last page")
+	}
+
+	// Test invalid cursor
+	_, err = server.handleListResourceTemplates(context.Background(), &transport.BaseJSONRPCRequest{
+		Params: []byte(`{"cursor":"invalid-cursor"}`),
+	}, protocol.RequestHandlerExtra{})
+	if err == nil {
+		t.Error("Expected error for invalid cursor")
+	}
+
+	// Test without pagination (should return all templates)
+	server.paginationLimit = nil
+	resp, err = server.handleListResourceTemplates(context.Background(), &transport.BaseJSONRPCRequest{
+		Params: []byte(`{}`),
+	}, protocol.RequestHandlerExtra{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	templatesResp, ok = resp.(ListResourceTemplatesResponse)
+	if !ok {
+		t.Fatal("Expected ListResourceTemplatesResponse")
+	}
+
+	if len(templatesResp.Templates) != 5 {
+		t.Errorf("Expected 5 templates, got %d", len(templatesResp.Templates))
+	}
+	if templatesResp.NextCursor != nil {
+		t.Error("Expected no next cursor when pagination is disabled")
+	}
+}

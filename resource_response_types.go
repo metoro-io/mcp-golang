@@ -36,3 +36,29 @@ type ResourceSchema struct {
 	// The URI of this resource.
 	Uri string `json:"uri" yaml:"uri" mapstructure:"uri"`
 }
+
+// A resource template that defines a pattern for dynamic resources.
+type ResourceTemplateSchema struct {
+	// Annotations corresponds to the JSON schema field "annotations".
+	Annotations *Annotations `json:"annotations,omitempty" yaml:"annotations,omitempty" mapstructure:"annotations,omitempty"`
+
+	// A description of what resources matching this template represent.
+	Description *string `json:"description,omitempty" yaml:"description,omitempty" mapstructure:"description,omitempty"`
+
+	// The MIME type of resources matching this template, if known.
+	MimeType *string `json:"mimeType,omitempty" yaml:"mimeType,omitempty" mapstructure:"mimeType,omitempty"`
+
+	// A human-readable name for this template.
+	Name string `json:"name" yaml:"name" mapstructure:"name"`
+
+	// The URI template following RFC 6570.
+	UriTemplate string `json:"uriTemplate" yaml:"uriTemplate" mapstructure:"uriTemplate"`
+}
+
+// The server's response to a resources/templates/list request from the client.
+type ListResourceTemplatesResponse struct {
+	// Templates corresponds to the JSON schema field "templates".
+	Templates []*ResourceTemplateSchema `json:"resourceTemplates" yaml:"resourceTemplates" mapstructure:"resourceTemplates"`
+	// NextCursor is a cursor for pagination. If not nil, there are more templates available.
+	NextCursor *string `json:"nextCursor,omitempty" yaml:"nextCursor,omitempty" mapstructure:"nextCursor,omitempty"`
+}
