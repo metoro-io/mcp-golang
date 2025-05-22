@@ -209,6 +209,23 @@ func (s *Server) RegisterTool(name string, description string, handler any) erro
 	return s.sendToolListChangedNotification()
 }
 
+func (s *Server) RegisterToolWithInputSchema(name string, description string, handler any, inputSchema *jsonschema.Schema) error {
+	err := validateToolHandler(handler)
+	if err != nil {
+		return err
+	}
+	//inputSchema := createJsonSchemaFromHandler(handler)
+
+	s.tools.Store(name, &tool{
+		Name:            name,
+		Description:     description,
+		Handler:         createWrappedToolHandler(handler),
+		ToolInputSchema: inputSchema,
+	})
+
+	return s.sendToolListChangedNotification()
+}
+
 func (s *Server) sendToolListChangedNotification() error {
 	if !s.isRunning {
 		return nil
