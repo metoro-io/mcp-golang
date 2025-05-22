@@ -58,187 +58,187 @@
 // */
 package sse
 
-//
-//import (
-//	"context"
-//	"encoding/json"
-//	"fmt"
-//	"github.com/metoro-io/mcp-golang/transport"
-//	"net/http"
-//	"sync"
-//
-//	"github.com/google/uuid"
-//)
-//
-//const (
-//	maxMessageSize = 4 * 1024 * 1024 // 4MB
-//)
-//
-//// SSETransport implements a Server-Sent Events transport for JSON-RPC messages
-//type SSETransport struct {
-//	endpoint    string
-//	sessionID   string
-//	writer      http.ResponseWriter
-//	flusher     http.Flusher
-//	mu          sync.Mutex
-//	isConnected bool
-//
-//	// Callbacks
-//	closeHandler   func()
-//	errorHandler   func(error)
-//	messageHandler func(message *transport.BaseJsonRpcMessage)
-//}
-//
-//// NewSSETransport creates a new SSE transport with the given endpoint and response writer
-//func NewSSETransport(endpoint string, w http.ResponseWriter) (*SSETransport, error) {
-//	flusher, ok := w.(http.Flusher)
-//	if !ok {
-//		return nil, fmt.Errorf("streaming not supported")
-//	}
-//
-//	return &SSETransport{
-//		endpoint:  endpoint,
-//		sessionID: uuid.New().String(),
-//		writer:    w,
-//		flusher:   flusher,
-//	}, nil
-//}
-//
-//// Start initializes the SSE connection
-//func (t *SSETransport) Start(ctx context.Context) error {
-//	t.mu.Lock()
-//	defer t.mu.Unlock()
-//
-//	if t.isConnected {
-//		return fmt.Errorf("SSE transport already started")
-//	}
-//
-//	// Set SSE headers
-//	h := t.writer.Header()
-//	h.Set("Content-Type", "text/event-stream")
-//	h.Set("Cache-Control", "no-cache")
-//	h.Set("Connection", "keep-alive")
-//	h.Set("Access-Control-Allow-Origin", "*")
-//
-//	// Send the endpoint event
-//	endpointURL := fmt.Sprintf("%s?sessionId=%s", t.endpoint, t.sessionID)
-//	if err := t.writeEvent("endpoint", endpointURL); err != nil {
-//		return err
-//	}
-//
-//	t.isConnected = true
-//
-//	// Handle context cancellation
-//	go func() {
-//		<-ctx.Done()
-//		t.Close()
-//	}()
-//
-//	return nil
-//}
-//
-//// HandleMessage processes an incoming message
-//func (t *SSETransport) HandleMessage(msg []byte) error {
-//	var rpcMsg map[string]interface{}
-//	if err := json.Unmarshal(msg, &rpcMsg); err != nil {
-//		if t.errorHandler != nil {
-//			t.errorHandler(err)
-//		}
-//		return err
-//	}
-//
-//	// Parse as a JSONRPCMessage
-//	var jsonrpcMsg JSONRPCMessage
-//	if _, ok := rpcMsg["method"]; ok {
-//		var req JSONRPCRequest
-//		if err := json.Unmarshal(msg, &req); err != nil {
-//			if t.errorHandler != nil {
-//				t.errorHandler(err)
-//			}
-//			return err
-//		}
-//		jsonrpcMsg = &req
-//	} else {
-//		var resp JSONRPCResponse
-//		if err := json.Unmarshal(msg, &resp); err != nil {
-//			if t.errorHandler != nil {
-//				t.errorHandler(err)
-//			}
-//			return err
-//		}
-//		jsonrpcMsg = &resp
-//	}
-//
-//	if t.messageHandler != nil {
-//		t.messageHandler(jsonrpcMsg)
-//	}
-//	return nil
-//}
-//
-//// Send sends a message over the SSE connection
-//func (t *SSETransport) Send(msg JSONRPCMessage) error {
-//	t.mu.Lock()
-//	defer t.mu.Unlock()
-//
-//	if !t.isConnected {
-//		return fmt.Errorf("not connected")
-//	}
-//
-//	data, err := json.Marshal(msg)
-//	if err != nil {
-//		return err
-//	}
-//
-//	return t.writeEvent("message", string(data))
-//}
-//
-//// Close closes the SSE connection
-//func (t *SSETransport) Close() error {
-//	t.mu.Lock()
-//	defer t.mu.Unlock()
-//
-//	if !t.isConnected {
-//		return nil
-//	}
-//
-//	t.isConnected = false
-//	if t.closeHandler != nil {
-//		t.closeHandler()
-//	}
-//	return nil
-//}
-//
-//// SetCloseHandler sets the callback for when the connection is closed
-//func (t *SSETransport) SetCloseHandler(handler func()) {
-//	t.mu.Lock()
-//	defer t.mu.Unlock()
-//	t.closeHandler = handler
-//}
-//
-//// SetErrorHandler sets the callback for when an error occurs
-//func (t *SSETransport) SetErrorHandler(handler func(error)) {
-//	t.mu.Lock()
-//	defer t.mu.Unlock()
-//	t.errorHandler = handler
-//}
-//
-//// SetMessageHandler sets the callback for when a message is received
-//func (t *SSETransport) SetMessageHandler(handler func(JSONRPCMessage)) {
-//	t.mu.Lock()
-//	defer t.mu.Unlock()
-//	t.messageHandler = handler
-//}
-//
-//// SessionID returns the unique session identifier for this transport
-//func (t *SSETransport) SessionID() string {
-//	return t.sessionID
-//}
-//
-//// writeEvent writes an SSE event with the given event type and data
-//func (t *SSETransport) writeEvent(event, data string) error {
-//	if _, err := fmt.Fprintf(t.writer, "event: %s\ndata: %s\n\n", event, data); err != nil {
-//		return err
-//	}
-//	t.flusher.Flush()
-//	return nil
-//}
+import (
+	"context"
+	"encoding/json"
+	"fmt"
+	"net/http"
+	"sync"
+
+	"github.com/metoro-io/mcp-golang/transport"
+
+	"github.com/google/uuid"
+)
+
+const (
+	MaxMessageSize = 4 * 1024 * 1024 // 4MB
+)
+
+// SSETransport implements a Server-Sent Events transport for JSON-RPC messages
+type SSETransport struct {
+	endpoint    string
+	sessionID   string
+	writer      http.ResponseWriter
+	flusher     http.Flusher
+	mu          sync.Mutex
+	isConnected bool
+
+	// Callbacks
+	closeHandler   func()
+	errorHandler   func(error)
+	messageHandler func(ctx context.Context, message *transport.BaseJsonRpcMessage)
+}
+
+// NewSSETransport creates a new SSE transport with the given endpoint and response writer
+func NewSSETransport(endpoint string, w http.ResponseWriter) (*SSETransport, error) {
+	flusher, ok := w.(http.Flusher)
+	if !ok {
+		return nil, fmt.Errorf("streaming not supported")
+	}
+
+	return &SSETransport{
+		endpoint:  endpoint,
+		sessionID: uuid.New().String(),
+		writer:    w,
+		flusher:   flusher,
+	}, nil
+}
+
+// Start initializes the SSE connection
+func (t *SSETransport) Start(ctx context.Context) error {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+
+	if t.isConnected {
+		return fmt.Errorf("SSE transport already started")
+	}
+
+	// Set SSE headers
+	h := t.writer.Header()
+	h.Set("Content-Type", "text/event-stream")
+	h.Set("Cache-Control", "no-cache")
+	h.Set("Connection", "keep-alive")
+	h.Set("Access-Control-Allow-Origin", "*")
+
+	// Send the endpoint event
+	endpointURL := fmt.Sprintf("%s?sessionId=%s", t.endpoint, t.sessionID)
+	if err := t.writeEvent("endpoint", endpointURL); err != nil {
+		return err
+	}
+
+	t.isConnected = true
+
+	// Handle context cancellation
+	go func() {
+		<-ctx.Done()
+		t.Close()
+	}()
+
+	return nil
+}
+
+// HandleMessage processes an incoming message
+func (t *SSETransport) HandleMessage(msg []byte) error {
+	var rpcMsg map[string]interface{}
+	if err := json.Unmarshal(msg, &rpcMsg); err != nil {
+		if t.errorHandler != nil {
+			t.errorHandler(err)
+		}
+		return err
+	}
+
+	// Parse as a JSONRPCMessage
+	var jsonrpcMsg *transport.BaseJsonRpcMessage
+	if _, ok := rpcMsg["method"]; ok {
+		var req transport.BaseJSONRPCRequest
+		if err := json.Unmarshal(msg, &req); err != nil {
+			if t.errorHandler != nil {
+				t.errorHandler(err)
+			}
+			return err
+		}
+		jsonrpcMsg = transport.NewBaseMessageRequest(&req)
+	} else {
+		var resp transport.BaseJSONRPCResponse
+		if err := json.Unmarshal(msg, &resp); err != nil {
+			if t.errorHandler != nil {
+				t.errorHandler(err)
+			}
+			return err
+		}
+		jsonrpcMsg = transport.NewBaseMessageResponse(&resp)
+	}
+
+	if t.messageHandler != nil {
+		t.messageHandler(context.TODO(), jsonrpcMsg)
+	}
+	return nil
+}
+
+// Send sends a message over the SSE connection
+func (t *SSETransport) Send(msg transport.JSONRPCMessage) error {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+
+	if !t.isConnected {
+		return fmt.Errorf("not connected")
+	}
+
+	data, err := json.Marshal(msg)
+	if err != nil {
+		return err
+	}
+
+	return t.writeEvent("message", string(data))
+}
+
+// Close closes the SSE connection
+func (t *SSETransport) Close() error {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+
+	if !t.isConnected {
+		return nil
+	}
+
+	t.isConnected = false
+	if t.closeHandler != nil {
+		t.closeHandler()
+	}
+	return nil
+}
+
+// SetCloseHandler sets the callback for when the connection is closed
+func (t *SSETransport) SetCloseHandler(handler func()) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	t.closeHandler = handler
+}
+
+// SetErrorHandler sets the callback for when an error occurs
+func (t *SSETransport) SetErrorHandler(handler func(error)) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	t.errorHandler = handler
+}
+
+// SetMessageHandler sets the callback for when a message is received
+func (t *SSETransport) SetMessageHandler(handler func(ctx context.Context, msg *transport.BaseJsonRpcMessage)) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	t.messageHandler = handler
+}
+
+// SessionID returns the unique session identifier for this transport
+func (t *SSETransport) SessionID() string {
+	return t.sessionID
+}
+
+// writeEvent writes an SSE event with the given event type and data
+func (t *SSETransport) writeEvent(event, data string) error {
+	if _, err := fmt.Fprintf(t.writer, "event: %s\ndata: %s\n\n", event, data); err != nil {
+		return err
+	}
+	t.flusher.Flush()
+	return nil
+}
