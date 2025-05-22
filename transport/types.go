@@ -224,3 +224,12 @@ func NewBaseMessageError(error *BaseJSONRPCError) *BaseJsonRpcMessage {
 		},
 	}
 }
+
+type JSONRPCCommon struct {
+	Jsonrpc string                 `json:"jsonrpc"`
+	Id      *RequestId             `json:"id,omitempty"`
+	Method  string                 `json:"method,omitempty"`
+	Params  json.RawMessage        `json:"params,omitempty"`
+	Result  json.RawMessage        `json:"result,omitempty"`
+	Error   *BaseJSONRPCErrorInner `json:"error,omitempty"`
+}
