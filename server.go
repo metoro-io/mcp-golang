@@ -306,12 +306,12 @@ func validateResourceHandler(handler any) error {
 	if handlerType.NumOut() != 2 {
 		return fmt.Errorf("handler must return exactly two values, got %d", handlerType.NumOut())
 	}
-	//if handlerType.Out(0) != reflect.TypeOf((*ResourceResponse)(nil)).Elem() {
+	// if handlerType.Out(0) != reflect.TypeOf((*ResourceResponse)(nil)).Elem() {
 	//	return fmt.Errorf("handler must return ResourceResponse, got %s", handlerType.Out(0).Name())
-	//}
-	//if handlerType.Out(1) != reflect.TypeOf((*error)(nil)).Elem() {
+	// }
+	// if handlerType.Out(1) != reflect.TypeOf((*error)(nil)).Elem() {
 	//	return fmt.Errorf("handler must return error, got %s", handlerType.Out(1).Name())
-	//}
+	// }
 	return nil
 }
 
@@ -584,6 +584,7 @@ func (s *Server) Serve() error {
 	pr := s.protocol
 	pr.SetRequestHandler("ping", s.handlePing)
 	pr.SetRequestHandler("initialize", s.handleInitialize)
+	pr.SetNotificationHandler("notifications/initialized", s.handleNotificationsInitialize)
 	pr.SetRequestHandler("tools/list", s.handleListTools)
 	pr.SetRequestHandler("tools/call", s.handleToolCalls)
 	pr.SetRequestHandler("prompts/list", s.handleListPrompts)
@@ -613,14 +614,18 @@ func (s *Server) handleInitialize(ctx context.Context, request *transport.BaseJS
 	}, nil
 }
 
+func (s *Server) handleNotificationsInitialize(notification *transport.BaseJSONRPCNotification) error {
+	// After successful initialization, the client MUST send a notifications/initialized to indicate it is ready to begin normal operations
+	// From https://modelcontextprotocol.io/specification/2025-03-26/basic/lifecycle
+	return nil
+}
+
 func (s *Server) handleListTools(ctx context.Context, request *transport.BaseJSONRPCRequest, _ protocol.RequestHandlerExtra) (transport.JsonRpcBody, error) {
 	type toolRequestParams struct {
 		Cursor *string `json:"cursor"`
 	}
 	var params toolRequestParams
-	if request.Params == nil {
-		params = toolRequestParams{}
-	} else {
+	if request.Params != nil {
 		err := json.Unmarshal(request.Params, &params)
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to unmarshal arguments")
@@ -735,9 +740,11 @@ func (s *Server) handleListPrompts(ctx context.Context, request *transport.BaseJ
 		Cursor *string `json:"cursor"`
 	}
 	var params promptRequestParams
-	err := json.Unmarshal(request.Params, &params)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to unmarshal arguments")
+	if request.Params != nil {
+		err := json.Unmarshal(request.Params, &params)
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to unmarshal arguments")
+		}
 	}
 
 	// Order by name for pagination
@@ -799,9 +806,7 @@ func (s *Server) handleListResources(ctx context.Context, request *transport.Bas
 		Cursor *string `json:"cursor"`
 	}
 	var params resourceRequestParams
-	if request.Params == nil {
-		params = resourceRequestParams{}
-	} else {
+	if request.Params != nil {
 		err := json.Unmarshal(request.Params, &params)
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to unmarshal arguments")
@@ -871,9 +876,7 @@ func (s *Server) handleListResourceTemplates(ctx context.Context, request *trans
 		Cursor *string `json:"cursor"`
 	}
 	var params resourceTemplateRequestParams
-	if request.Params == nil {
-		params = resourceTemplateRequestParams{}
-	} else {
+	if request.Params != nil {
 		err := json.Unmarshal(request.Params, &params)
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to unmarshal arguments")
