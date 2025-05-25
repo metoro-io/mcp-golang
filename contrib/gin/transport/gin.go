@@ -1,4 +1,4 @@
-package http
+package transport
 
 import (
 	"context"
@@ -8,17 +8,18 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/metoro-io/mcp-golang/transport"
+	mcphttp "github.com/metoro-io/mcp-golang/transport/http"
 )
 
 // GinTransport implements a stateless HTTP transport for MCP using Gin
 type GinTransport struct {
-	*baseTransport
+	base *mcphttp.BaseTransport
 }
 
 // NewGinTransport creates a new Gin transport
 func NewGinTransport() *GinTransport {
 	return &GinTransport{
-		baseTransport: newBaseTransport(),
+		base: mcphttp.NewBaseTransport(),
 	}
 }
 
@@ -30,7 +31,7 @@ func (t *GinTransport) Start(ctx context.Context) error {
 // Send implements Transport.Send
 func (t *GinTransport) Send(ctx context.Context, message *transport.BaseJsonRpcMessage) error {
 	key := message.JsonRpcResponse.Id
-	responseChannel := t.responseMap[int64(key)]
+	responseChannel := t.base.ResponseMap[int64(key)]
 	if responseChannel == nil {
 		return fmt.Errorf("no response channel found for key: %d", key)
 	}
@@ -40,31 +41,25 @@ func (t *GinTransport) Send(ctx context.Context, message *transport.BaseJsonRpcM
 
 // Close implements Transport.Close
 func (t *GinTransport) Close() error {
-	if t.closeHandler != nil {
-		t.closeHandler()
+	if t.base.CloseHandler != nil {
+		t.base.CloseHandler()
 	}
 	return nil
 }
 
 // SetCloseHandler implements Transport.SetCloseHandler
 func (t *GinTransport) SetCloseHandler(handler func()) {
-	t.mu.Lock()
-	defer t.mu.Unlock()
-	t.closeHandler = handler
+	t.base.CloseHandler = handler
 }
 
 // SetErrorHandler implements Transport.SetErrorHandler
 func (t *GinTransport) SetErrorHandler(handler func(error)) {
-	t.mu.Lock()
-	defer t.mu.Unlock()
-	t.errorHandler = handler
+	t.base.ErrorHandler = handler
 }
 
 // SetMessageHandler implements Transport.SetMessageHandler
 func (t *GinTransport) SetMessageHandler(handler func(ctx context.Context, message *transport.BaseJsonRpcMessage)) {
-	t.mu.Lock()
-	defer t.mu.Unlock()
-	t.messageHandler = handler
+	t.base.MessageHandler = handler
 }
 
 // Handler returns a Gin handler function that can be used with Gin's router
@@ -77,13 +72,13 @@ func (t *GinTransport) Handler() gin.HandlerFunc {
 			return
 		}
 
-		body, err := t.readBody(c.Request.Body)
+		body, err := t.base.ReadBody(c.Request.Body)
 		if err != nil {
 			c.String(http.StatusBadRequest, err.Error())
 			return
 		}
 
-		response, err := t.handleMessage(ctx, body)
+		response, err := t.base.HandleMessage(ctx, body)
 		if err != nil {
 			c.String(http.StatusInternalServerError, err.Error())
 			return
@@ -91,8 +86,8 @@ func (t *GinTransport) Handler() gin.HandlerFunc {
 
 		jsonData, err := json.Marshal(response)
 		if err != nil {
-			if t.errorHandler != nil {
-				t.errorHandler(fmt.Errorf("failed to marshal response: %w", err))
+			if t.base.ErrorHandler != nil {
+				t.base.ErrorHandler(fmt.Errorf("failed to marshal response: %w", err))
 			}
 			c.String(http.StatusInternalServerError, "Failed to marshal response")
 			return
