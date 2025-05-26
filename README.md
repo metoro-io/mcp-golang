@@ -82,6 +82,9 @@ func main() {
 	err = server.RegisterResource("test://resource", "resource_test", "This is a test resource", "application/json", func() (*mcp_golang.ResourceResponse, error) {
 		return mcp_golang.NewResourceResponse(mcp_golang.NewTextEmbeddedResource("test://resource", "This is a test resource", "application/json")), nil
 	})
+	if err != nil {
+		panic(err)
+	}    
 
 	err = server.Serve()
 	if err != nil {
