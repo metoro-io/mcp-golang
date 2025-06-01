@@ -1,0 +1,36 @@
+syntax = "proto3";
+
+option go_package = "github.com/metoro-io/mcp-golang/transport/grpc/protogen/jsonrpc";
+
+// Generate go proto file using:
+// $ export GOMODULE_PKG=protogen/jsonrpc
+// $ protoc --go_out $GOMODULE_PKG --go_opt paths=source_relative --go-grpc_out $GOMODULE_PKG --go-grpc_opt paths=source_relative -I /usr/local/include -I . ./jsonrpc.proto
+
+import "google/protobuf/struct.proto";
+
+service JSONRPCService {
+  rpc Transport (stream GenericJSONRPCMessage) returns (stream GenericJSONRPCMessage);
+}
+
+// Represents a request ID (string or number)
+message ID {
+  oneof kind {
+    string str = 1;
+    int64 num = 2;
+  }
+}
+
+message GenericJSONRPCMessage {
+  string jsonrpc = 1;
+  ID typed_id = 2;
+  string method = 3;
+  google.protobuf.Struct params = 4;
+  google.protobuf.Struct result = 5;
+  JSONRPCError error = 6;
+}
+
+message JSONRPCError {
+  int32 code = 1;
+  string message = 2;
+  string data = 3;
+}
