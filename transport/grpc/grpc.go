@@ -81,9 +81,9 @@ func (t *GrpcServerTransport) Close() error {
 func (t *GrpcServerTransport) Send(ctx context.Context, message *transport.BaseJsonRpcMessage) error {
 	// TODO: debug log the response
 
-	stream := ctx.Value(ctxKey("stream")).(pb.JSONRPCService_TransportServer)
-	if stream == nil {
-		return fmt.Errorf("could not find the stream for sending response; ctx: %v", ctx)
+	stream, ok := ctx.Value(ctxKey("stream")).(pb.JSONRPCService_TransportServer)
+	if !ok || stream == nil {
+		return fmt.Errorf("could not find a valid stream for sending response; ctx: %v", ctx)
 	}
 
 	msg, err := ToGenericRpcMessage(message)
@@ -137,7 +137,7 @@ func (t *GrpcServerTransport) Transport(stream pb.JSONRPCService_TransportServer
 		if baseMsg, err := ToBaseJsonRpcMessage(ms); err != nil {
 			return err
 		} else {
-			// TODO: debug log the recevied request
+			// TODO: debug log the received request
 			t.onMessage(ctx, baseMsg)
 		}
 	}
@@ -265,8 +265,16 @@ func ToGenericRpcMessage(m *transport.BaseJsonRpcMessage) (*pb.GenericJSONRPCMes
 	case transport.BaseMessageTypeJSONRPCErrorType:
 		msg.Jsonrpc = m.JsonRpcError.Jsonrpc
 		msg.TypedId = &pb.ID{Kind: &pb.ID_Num{Num: int64(m.JsonRpcError.Id)}}
+		var dataString string
+		if m.JsonRpcError.Error.Data != nil {
+			dataBytes, err := json.Marshal(m.JsonRpcError.Error.Data)
+			if err != nil {
+				return nil, fmt.Errorf("failed to marshal error data: %w", err)
+			}
+			dataString = string(dataBytes)
+		}
 		msg.Error = &pb.JSONRPCError{
-			// Data:    string(m.JsonRpcError.Error.Data), // TODO: convert the data interface to string
+			Data:    dataString,
 			Code:    int32(m.JsonRpcError.Error.Code),
 			Message: m.JsonRpcError.Error.Message,
 		}
