@@ -83,8 +83,9 @@ func (c *Client) ListTools(ctx context.Context, cursor *string) (*ToolsResponse,
 		return nil, errors.New("client not initialized")
 	}
 
-	params := map[string]interface{}{
-		"cursor": cursor,
+	params := map[string]interface{}{}
+	if cursor != nil {
+		params["cursor"] = *cursor
 	}
 
 	response, err := c.protocol.Request(ctx, "tools/list", params, nil)
