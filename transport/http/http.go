@@ -10,6 +10,8 @@ import (
 	"github.com/metoro-io/mcp-golang/transport"
 )
 
+type HTTPMiddleware func(http.Handler) http.Handler
+
 // HTTPTransport implements a stateless HTTP transport for MCP
 type HTTPTransport struct {
 	*baseTransport
@@ -20,6 +22,7 @@ type HTTPTransport struct {
 	closeHandler   func()
 	mu             sync.RWMutex
 	addr           string
+	middleware     []HTTPMiddleware
 }
 
 // NewHTTPTransport creates a new HTTP transport that listens on the specified endpoint
@@ -37,10 +40,22 @@ func (t *HTTPTransport) WithAddr(addr string) *HTTPTransport {
 	return t
 }
 
+// WithMiddleware adds HTTP middleware to be chained in before the MCP server
+func (t *HTTPTransport) WithMiddleware(middleware ...HTTPMiddleware) *HTTPTransport {
+	t.middleware = append(t.middleware, middleware...)
+	return t
+}
+
 // Start implements Transport.Start
 func (t *HTTPTransport) Start(ctx context.Context) error {
 	mux := http.NewServeMux()
-	mux.HandleFunc(t.endpoint, t.handleRequest)
+
+	var h http.Handler = http.HandlerFunc(t.handleRequest)
+	for idx := len(t.middleware) - 1; idx >= 0; idx-- {
+		h = t.middleware[idx](h)
+	}
+
+	mux.HandleFunc(t.endpoint, h.ServeHTTP)
 
 	t.server = &http.Server{
 		Addr:    t.addr,
