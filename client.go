@@ -74,6 +74,14 @@ func (c *Client) Initialize(ctx context.Context) (*InitializeResponse, error) {
 
 	c.capabilities = &initResult.Capabilities
 	c.initialized = true
+
+	// Send notifications/initialized message as required by MCP protocol
+	// This notifies the server that the client has completed initialization
+	// and is ready to receive requests. Python MCP servers require this.
+	if err := c.protocol.Notification("notifications/initialized", map[string]interface{}{}); err != nil {
+		return nil, errors.Wrap(err, "failed to send initialized notification")
+	}
+
 	return &initResult, nil
 }
 
