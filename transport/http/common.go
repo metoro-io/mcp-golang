@@ -82,7 +82,22 @@ func (t *baseTransport) handleMessage(ctx context.Context, body []byte) (*transp
 
 	var prevId *transport.RequestId = nil
 	deserialized := false
-	// Try to unmarshal as a request first
+	// Try as a notification first (no id field)
+	var notification transport.BaseJSONRPCNotification
+	if err := json.Unmarshal(body, &notification); err == nil {
+		deserialized = true
+		t.mu.RLock()
+		handler := t.messageHandler
+		t.mu.RUnlock()
+
+		if handler != nil {
+			handler(ctx, transport.NewBaseMessageNotification(&notification))
+		}
+		// For notifications, we don't return a response - return nil to indicate no response needed
+		return nil, nil
+	}
+
+	// Try to unmarshal as a request (has id field)
 	var request transport.BaseJSONRPCRequest
 	if err := json.Unmarshal(body, &request); err == nil {
 		deserialized = true
@@ -95,21 +110,6 @@ func (t *baseTransport) handleMessage(ctx context.Context, body []byte) (*transp
 
 		if handler != nil {
 			handler(ctx, transport.NewBaseMessageRequest(&request))
-		}
-	}
-
-	// Try as a notification
-	var notification transport.BaseJSONRPCNotification
-	if !deserialized {
-		if err := json.Unmarshal(body, &notification); err == nil {
-			deserialized = true
-			t.mu.RLock()
-			handler := t.messageHandler
-			t.mu.RUnlock()
-
-			if handler != nil {
-				handler(ctx, transport.NewBaseMessageNotification(&notification))
-			}
 		}
 	}
 
