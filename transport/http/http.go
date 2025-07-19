@@ -128,6 +128,12 @@ func (t *HTTPTransport) handleRequest(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// For notifications, response will be nil - just return 200 OK with empty body
+	if response == nil {
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+
 	jsonData, err := json.Marshal(response)
 	if err != nil {
 		if t.errorHandler != nil {

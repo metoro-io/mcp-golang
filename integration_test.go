@@ -302,7 +302,20 @@ func startTestServerWithResource(t *testing.T, uri, text, mimeType string) (*htt
 			return
 		}
 
-		// Parse the request
+		// First try to parse as notification (no id field)
+		var notification transport.BaseJSONRPCNotification
+		if err := json.Unmarshal(body, &notification); err == nil {
+			// This is a notification - just return 200 OK for notifications like initialized
+			if notification.Method == "notifications/initialized" {
+				w.WriteHeader(http.StatusOK)
+				return
+			}
+			// Other notifications can also just return OK
+			w.WriteHeader(http.StatusOK)
+			return
+		}
+
+		// Parse as request (has id field)
 		var request transport.BaseJSONRPCRequest
 		err = json.Unmarshal(body, &request)
 		if err != nil {
