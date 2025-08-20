@@ -735,9 +735,13 @@ func (s *Server) handleListPrompts(ctx context.Context, request *transport.BaseJ
 		Cursor *string `json:"cursor"`
 	}
 	var params promptRequestParams
-	err := json.Unmarshal(request.Params, &params)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to unmarshal arguments")
+	if request.Params == nil {
+		params = promptRequestParams{}
+	} else {
+		err := json.Unmarshal(request.Params, &params)
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to unmarshal arguments")
+		}
 	}
 
 	// Order by name for pagination
