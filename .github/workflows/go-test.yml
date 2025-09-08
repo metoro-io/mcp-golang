@@ -17,7 +17,7 @@ jobs:
     - name: Set up Go
       uses: actions/setup-go@v4
       with:
-        go-version: '1.23'  # You can adjust this version as needed
+        go-version: '1.23'  # Test with the same version as goreleaser
         cache: false  # Disable caching as its super slow
 
     - name: Install dependencies
