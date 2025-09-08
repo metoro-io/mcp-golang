@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"sync"
 
 	"github.com/metoro-io/mcp-golang/transport"
 )
@@ -15,10 +14,6 @@ type HTTPTransport struct {
 	*baseTransport
 	server         *http.Server
 	endpoint       string
-	messageHandler func(ctx context.Context, message *transport.BaseJsonRpcMessage)
-	errorHandler   func(error)
-	closeHandler   func()
-	mu             sync.RWMutex
 	addr           string
 }
 
