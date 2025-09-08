@@ -98,9 +98,10 @@ type BaseJSONRPCNotification struct {
 // Requires a Jsonrpc and Method
 func (m *BaseJSONRPCNotification) UnmarshalJSON(data []byte) error {
 	required := struct {
-		Jsonrpc *string `json:"jsonrpc" yaml:"jsonrpc" mapstructure:"jsonrpc"`
-		Method  *string `json:"method" yaml:"method" mapstructure:"method"`
-		Id      *int64  `json:"id" yaml:"id" mapstructure:"id"`
+		Jsonrpc *string          `json:"jsonrpc" yaml:"jsonrpc" mapstructure:"jsonrpc"`
+		Method  *string          `json:"method" yaml:"method" mapstructure:"method"`
+		Id      *int64           `json:"id" yaml:"id" mapstructure:"id"`
+		Params  *json.RawMessage `json:"params" yaml:"params" mapstructure:"params"`
 	}{}
 	err := json.Unmarshal(data, &required)
 	if err != nil {
@@ -115,8 +116,12 @@ func (m *BaseJSONRPCNotification) UnmarshalJSON(data []byte) error {
 	if required.Id != nil {
 		return errors.New("field id in BaseJSONRPCNotification: not allowed")
 	}
+	if required.Params == nil {
+		required.Params = new(json.RawMessage)
+	}
 	m.Jsonrpc = *required.Jsonrpc
 	m.Method = *required.Method
+	m.Params = *required.Params
 	return nil
 }
 

@@ -18,12 +18,26 @@ type Client struct {
 	info         ClientInfo
 }
 
+type ClientOptions func(*Client)
+
+func WithNotificationHandler(
+	method string, handler func(notification *transport.BaseJSONRPCNotification) error,
+) ClientOptions {
+	return func(c *Client) {
+		c.protocol.SetNotificationHandler(method, handler)
+	}
+}
+
 // NewClient creates a new MCP client with the specified transport
-func NewClient(transport transport.Transport) *Client {
-	return &Client{
+func NewClient(transport transport.Transport, options ...ClientOptions) *Client {
+	client := &Client{
 		transport: transport,
 		protocol:  protocol.NewProtocol(nil),
 	}
+	for _, option := range options {
+		option(client)
+	}
+	return client
 }
 
 type ClientInfo struct {
@@ -261,6 +275,19 @@ func (c *Client) ReadResource(ctx context.Context, uri string) (*ResourceRespons
 	}
 
 	return &resourceResponse, nil
+}
+
+func (c *Client) SetLoggingLevel(ctx context.Context, level Level) error {
+	if !c.initialized {
+		return errors.New("client not initialized")
+	}
+	params := map[string]Level{
+		"level": level,
+	}
+	if _, err := c.protocol.Request(ctx, "logging/setLevel", params, nil); err != nil {
+		return errors.Wrap(err, "failed to set logging level")
+	}
+	return nil
 }
 
 // Ping sends a ping request to the server to check connectivity

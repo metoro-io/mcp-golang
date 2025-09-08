@@ -8,6 +8,7 @@ import (
 	"reflect"
 	"sort"
 	"strings"
+	"sync"
 
 	"github.com/invopop/jsonschema"
 	"github.com/metoro-io/mcp-golang/internal/datastructures"
@@ -100,6 +101,7 @@ func (c promptResponseSent) MarshalJSON() ([]byte, error) {
 }
 
 type Server struct {
+	mu                 sync.RWMutex
 	isRunning          bool
 	transport          transport.Transport
 	protocol           *protocol.Protocol
@@ -111,6 +113,8 @@ type Server struct {
 	serverInstructions *string
 	serverName         string
 	serverVersion      string
+	capabilities       ServerCapabilities
+	loggingLevel       Level
 }
 
 type prompt struct {
@@ -147,6 +151,14 @@ type ServerOptions func(*Server)
 func WithProtocol(protocol *protocol.Protocol) ServerOptions {
 	return func(s *Server) {
 		s.protocol = protocol
+	}
+}
+
+func WithLoggingCapability() ServerOptions {
+	return func(s *Server) {
+		s.capabilities.Logging = map[string]interface{}{
+			"enable": true,
+		}
 	}
 }
 
@@ -189,6 +201,21 @@ func NewServer(transport transport.Transport, options ...ServerOptions) *Server 
 		option(server)
 	}
 	return server
+}
+
+func (s *Server) SendLogMessageNotification(level Level, logger string, data interface{}) error {
+	if !s.isRunning {
+		return nil
+	}
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	if level < s.loggingLevel {
+		return nil
+	}
+	if err := s.protocol.Notification("notifications/message", newLoggingMessageParams(level, logger, data)); err != nil {
+		return err
+	}
+	return nil
 }
 
 // RegisterTool registers a new tool with the server
@@ -592,6 +619,7 @@ func (s *Server) Serve() error {
 	pr.SetRequestHandler("resources/list", s.handleListResources)
 	pr.SetRequestHandler("resources/templates/list", s.handleListResourceTemplates)
 	pr.SetRequestHandler("resources/read", s.handleResourceCalls)
+	pr.SetRequestHandler("logging/setLevel", s.handleSetLoggingLevel)
 	err := pr.Connect(s.transport)
 	if err != nil {
 		return err
@@ -693,6 +721,28 @@ func (s *Server) handleListTools(ctx context.Context, request *transport.BaseJSO
 	}, nil
 }
 
+// handleSetLoggingLevel sets the logging level for server
+func (s *Server) handleSetLoggingLevel(ctx context.Context, request *transport.BaseJSONRPCRequest, _ protocol.RequestHandlerExtra) (transport.JsonRpcBody, error) {
+	type setLoggingLevelParams struct {
+		Level Level `json:"level"`
+	}
+	var params setLoggingLevelParams
+	if request.Params == nil {
+		params = setLoggingLevelParams{}
+	} else {
+		if err := json.Unmarshal(request.Params, &params); err != nil {
+			return nil, errors.Wrap(err, "Invalid params")
+		}
+	}
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if params.Level != LevelNil {
+		s.loggingLevel = params.Level
+	}
+	return struct{}{}, nil
+}
+
 func (s *Server) handleToolCalls(ctx context.Context, req *transport.BaseJSONRPCRequest, _ protocol.RequestHandlerExtra) (transport.JsonRpcBody, error) {
 	params := baseCallToolRequestParams{}
 	// Instantiate a struct of the type of the arguments
@@ -733,6 +783,7 @@ func (s *Server) generateCapabilities() ServerCapabilities {
 				ListChanged: &t,
 			}
 		}(),
+		Logging: s.capabilities.Logging,
 	}
 }
 func (s *Server) handleListPrompts(ctx context.Context, request *transport.BaseJSONRPCRequest, extra protocol.RequestHandlerExtra) (transport.JsonRpcBody, error) {
