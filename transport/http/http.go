@@ -49,17 +49,16 @@ func (t *HTTPTransport) WithMiddleware(middleware ...HTTPMiddleware) *HTTPTransp
 // Start implements Transport.Start
 func (t *HTTPTransport) Start(ctx context.Context) error {
 	mux := http.NewServeMux()
+	mux.HandleFunc(t.endpoint, t.handleRequest)
 
-	var h http.Handler = http.HandlerFunc(t.HandleRequest)
+	var h http.Handler = mux
 	for idx := len(t.middleware) - 1; idx >= 0; idx-- {
 		h = t.middleware[idx](h)
 	}
 
-	mux.HandleFunc(t.endpoint, h.ServeHTTP)
-
 	t.server = &http.Server{
 		Addr:    t.addr,
-		Handler: mux,
+		Handler: h,
 	}
 
 	return t.server.ListenAndServe()
@@ -124,7 +123,7 @@ func (t *HTTPTransport) SetMessageHandler(handler func(ctx context.Context, mess
 	t.messageHandler = handler
 }
 
-func (t *HTTPTransport) HandleRequest(w http.ResponseWriter, r *http.Request) {
+func (t *HTTPTransport) handleRequest(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "Only POST method is supported", http.StatusMethodNotAllowed)
 		return
