@@ -514,6 +514,7 @@ func createJsonSchemaFromHandler(handler any) *jsonschema.Schema {
 		argumentType = handlerType.In(0)
 	}
 	inputSchema := jsonSchemaReflector.ReflectFromType(argumentType)
+	inputSchema.Version = ""
 	return inputSchema
 }
 
