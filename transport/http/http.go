@@ -55,23 +55,16 @@ func (t *HTTPTransport) Send(ctx context.Context, message *transport.BaseJsonRpc
 	key := message.JsonRpcResponse.Id
 	fmt.Printf("[Send] Attempting to send response with key: %d\n", key)
 
-	responseChannel := t.baseTransport.responseMap[int64(key)]
-	if responseChannel == nil {
+	if err := t.baseTransport.Send(ctx, message); err != nil {
 		fmt.Printf("[Send] Response map keys: %v\n", t.getResponseMapKeys())
-
-		return fmt.Errorf("no response channel found for key: %d", key)
+		return err
 	}
-	responseChannel <- message
 	return nil
 }
 
 // Helper method to get keys
 func (t *HTTPTransport) getResponseMapKeys() []int64 {
-	keys := make([]int64, 0, len(t.baseTransport.responseMap))
-	for k := range t.baseTransport.responseMap {
-		keys = append(keys, k)
-	}
-	return keys
+	return t.baseTransport.getResponseMapKeys()
 }
 
 // Close implements Transport.Close

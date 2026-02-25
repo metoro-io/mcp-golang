@@ -25,10 +25,51 @@ func newBaseTransport() *baseTransport {
 	}
 }
 
+func (t *baseTransport) getResponseChannel(key int64) chan *transport.BaseJsonRpcMessage {
+	t.mu.RLock()
+	defer t.mu.RUnlock()
+	return t.responseMap[key]
+}
+
+func (t *baseTransport) reserveResponseChannel() (int64, chan *transport.BaseJsonRpcMessage) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+
+	var key int64 = 0
+	for key < 1000000 {
+		if _, ok := t.responseMap[key]; !ok {
+			break
+		}
+		key = key + 1
+	}
+
+	responseChannel := make(chan *transport.BaseJsonRpcMessage)
+	t.responseMap[key] = responseChannel
+	return key, responseChannel
+}
+
+func (t *baseTransport) deleteResponseChannel(key int64) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	delete(t.responseMap, key)
+}
+
+func (t *baseTransport) getResponseMapKeys() []int64 {
+	t.mu.RLock()
+	defer t.mu.RUnlock()
+
+	keys := make([]int64, 0, len(t.responseMap))
+	for key := range t.responseMap {
+		keys = append(keys, key)
+	}
+
+	return keys
+}
+
 // Send implements Transport.Send
 func (t *baseTransport) Send(ctx context.Context, message *transport.BaseJsonRpcMessage) error {
 	key := message.JsonRpcResponse.Id
-	responseChannel := t.responseMap[int64(key)]
+	responseChannel := t.getResponseChannel(int64(key))
 	if responseChannel == nil {
 		return fmt.Errorf("no response channel found for key: %d", key)
 	}
@@ -68,17 +109,7 @@ func (t *baseTransport) SetMessageHandler(handler func(ctx context.Context, mess
 // handleMessage processes an incoming message and returns a response
 func (t *baseTransport) handleMessage(ctx context.Context, body []byte) (*transport.BaseJsonRpcMessage, error) {
 	// Store the response writer for later use
-	t.mu.Lock()
-	var key int64 = 0
-
-	for key < 1000000 {
-		if _, ok := t.responseMap[key]; !ok {
-			break
-		}
-		key = key + 1
-	}
-	t.responseMap[key] = make(chan *transport.BaseJsonRpcMessage)
-	t.mu.Unlock()
+	key, responseChannel := t.reserveResponseChannel()
 
 	var prevId *transport.RequestId = nil
 	deserialized := false
@@ -144,10 +175,8 @@ func (t *baseTransport) handleMessage(ctx context.Context, body []byte) (*transp
 	}
 
 	// Block until the response is received
-	responseToUse := <-t.responseMap[key]
-	t.mu.Lock()
-	delete(t.responseMap, key)
-	t.mu.Unlock()
+	responseToUse := <-responseChannel
+	t.deleteResponseChannel(key)
 	if prevId != nil {
 		responseToUse.JsonRpcResponse.Id = *prevId
 	}
