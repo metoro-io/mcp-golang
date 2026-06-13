@@ -15,6 +15,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"testing"
 	"time"
 
@@ -147,7 +148,7 @@ func TestServerIntegration(t *testing.T) {
 			Jsonrpc: "2.0",
 			Method:  method,
 			Params:  json.RawMessage(paramsBytes),
-			Id:      transport.RequestId(i),
+			Id:      transport.RequestId(strconv.FormatInt(int64(i), 10)),
 		}
 		i++
 

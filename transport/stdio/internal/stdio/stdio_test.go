@@ -117,7 +117,7 @@ func TestMessageDeserialization(t *testing.T) {
 		assert.Equal(t, transport.BaseMessageTypeJSONRPCRequestType, msg.Type)
 		assert.Equal(t, "2.0", msg.JsonRpcRequest.Jsonrpc)
 		assert.Equal(t, "test", msg.JsonRpcRequest.Method)
-		assert.Equal(t, transport.RequestId(1), msg.JsonRpcRequest.Id)
+		assert.Equal(t, transport.RequestId("1"), msg.JsonRpcRequest.Id)
 	})
 
 	t.Run("notification", func(t *testing.T) {

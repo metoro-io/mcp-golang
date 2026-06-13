@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strconv"
 
 	"github.com/gin-gonic/gin"
 	"github.com/metoro-io/mcp-golang/transport"
@@ -30,9 +31,13 @@ func (t *GinTransport) Start(ctx context.Context) error {
 // Send implements Transport.Send
 func (t *GinTransport) Send(ctx context.Context, message *transport.BaseJsonRpcMessage) error {
 	key := message.JsonRpcResponse.Id
-	responseChannel := t.responseMap[int64(key)]
+	id, err := strconv.ParseInt(string(key), 10, 64)
+	if err != nil {
+		return fmt.Errorf("invalid response id: %w", err)
+	}
+	responseChannel := t.responseMap[id]
 	if responseChannel == nil {
-		return fmt.Errorf("no response channel found for key: %d", key)
+		return fmt.Errorf("no response channel found for key: %s", key)
 	}
 	responseChannel <- message
 	return nil
