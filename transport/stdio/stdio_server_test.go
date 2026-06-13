@@ -56,7 +56,7 @@ func TestStdioServerTransport(t *testing.T) {
 		assert.True(t, ok)
 		assert.True(t, req.Type == transport.BaseMessageTypeJSONRPCRequestType)
 		assert.Equal(t, "test", req.JsonRpcRequest.Method)
-		assert.Equal(t, transport.RequestId(1), req.JsonRpcRequest.Id)
+		assert.Equal(t, transport.RequestId("1"), req.JsonRpcRequest.Id)
 
 		err = tr.Close()
 		assert.NoError(t, err)
@@ -86,7 +86,7 @@ func TestStdioServerTransport(t *testing.T) {
 		msg := &transport.BaseJSONRPCResponse{
 			Jsonrpc: "2.0",
 			Result:  result,
-			Id:      1,
+			Id:      transport.RequestId("1"),
 		}
 
 		err := tr.Send(context.Background(), transport.NewBaseMessageResponse(msg))

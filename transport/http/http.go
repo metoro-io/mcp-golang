@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strconv"
 	"sync"
 
 	"github.com/metoro-io/mcp-golang/transport"
@@ -53,13 +54,17 @@ func (t *HTTPTransport) Start(ctx context.Context) error {
 // Send implements Transport.Send
 func (t *HTTPTransport) Send(ctx context.Context, message *transport.BaseJsonRpcMessage) error {
 	key := message.JsonRpcResponse.Id
-	fmt.Printf("[Send] Attempting to send response with key: %d\n", key)
+	fmt.Printf("[Send] Attempting to send response with key: %s\n", key)
 
-	responseChannel := t.baseTransport.responseMap[int64(key)]
+	id, err := strconv.ParseInt(string(key), 10, 64)
+	if err != nil {
+		return fmt.Errorf("invalid response id: %w", err)
+	}
+	responseChannel := t.baseTransport.responseMap[id]
 	if responseChannel == nil {
 		fmt.Printf("[Send] Response map keys: %v\n", t.getResponseMapKeys())
 
-		return fmt.Errorf("no response channel found for key: %d", key)
+		return fmt.Errorf("no response channel found for key: %s", key)
 	}
 	responseChannel <- message
 	return nil

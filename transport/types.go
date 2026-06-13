@@ -3,11 +3,37 @@ package transport
 import (
 	"encoding/json"
 	"errors"
+	"strconv"
 )
 
 type JSONRPCMessage interface{}
 
-type RequestId int64
+type RequestId string
+
+func (r RequestId) MarshalJSON() ([]byte, error) {
+	if r == "" {
+		return []byte("null"), nil
+	}
+	if _, err := strconv.ParseFloat(string(r), 64); err == nil {
+		return []byte(r), nil
+	}
+	return json.Marshal(string(r))
+}
+
+func (r *RequestId) UnmarshalJSON(data []byte) error {
+	var s string
+	if err := json.Unmarshal(data, &s); err == nil {
+		*r = RequestId(s)
+		return nil
+	}
+	var n json.Number
+	if err := json.Unmarshal(data, &n); err == nil {
+		*r = RequestId(string(n))
+		return nil
+	}
+	*r = ""
+	return nil
+}
 
 type BaseJSONRPCErrorInner struct {
 	// The error type that occurred.

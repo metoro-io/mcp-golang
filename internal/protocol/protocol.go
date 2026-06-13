@@ -69,6 +69,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strconv"
 	"sync"
 	"time"
 
@@ -116,7 +117,7 @@ type Protocol struct {
 	transport transport.Transport
 	options   *ProtocolOptions
 
-	requestMessageID transport.RequestId
+	requestMessageID int64
 	mu               sync.RWMutex
 
 	// Maps method name to request handler
@@ -396,7 +397,7 @@ func (p *Protocol) Request(ctx context.Context, method string, params interface{
 	}
 
 	p.mu.Lock()
-	id := p.requestMessageID
+	id :=  transport.RequestId(strconv.FormatInt(p.requestMessageID, 10))
 	p.requestMessageID++
 	ch := make(chan *responseEnvelope, 1)
 	p.responseHandlers[id] = ch

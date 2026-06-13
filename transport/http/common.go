@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"strconv"
 	"sync"
 
 	"github.com/metoro-io/mcp-golang/transport"
@@ -27,8 +28,12 @@ func newBaseTransport() *baseTransport {
 
 // Send implements Transport.Send
 func (t *baseTransport) Send(ctx context.Context, message *transport.BaseJsonRpcMessage) error {
-	key := message.JsonRpcResponse.Id
-	responseChannel := t.responseMap[int64(key)]
+	id := message.JsonRpcResponse.Id
+	key, err := strconv.ParseInt(string(id), 10, 64)
+	if err != nil {
+		return fmt.Errorf("invalid response id: %w", err)
+	}
+	responseChannel := t.responseMap[key]
 	if responseChannel == nil {
 		return fmt.Errorf("no response channel found for key: %d", key)
 	}
@@ -88,7 +93,7 @@ func (t *baseTransport) handleMessage(ctx context.Context, body []byte) (*transp
 		deserialized = true
 		id := request.Id
 		prevId = &id
-		request.Id = transport.RequestId(key)
+		request.Id = transport.RequestId(strconv.FormatInt(key, 10))
 		t.mu.RLock()
 		handler := t.messageHandler
 		t.mu.RUnlock()
