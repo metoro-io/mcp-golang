@@ -9,6 +9,12 @@ import (
 	"github.com/pkg/errors"
 )
 
+// ClientProtocolVersion is the MCP protocol version advertised by the client in the
+// initialize request. MCP uses date-based protocol versions; modern servers (e.g.
+// GitLab) reject the previously hardcoded "1.0". The server negotiates down to a
+// version it supports.
+const ClientProtocolVersion = "2025-06-18"
+
 // Client represents an MCP client that can connect to and interact with MCP servers
 type Client struct {
 	transport    transport.Transport
@@ -53,7 +59,7 @@ func (c *Client) Initialize(ctx context.Context) (*InitializeResponse, error) {
 
 	// Make initialize request to server
 	response, err := c.protocol.Request(ctx, "initialize", map[string]interface{}{
-		"protocolVersion": "1.0",
+		"protocolVersion": ClientProtocolVersion,
 		"capabilities":    map[string]interface{}{},
 		"clientInfo":      c.info,
 	}, nil)
