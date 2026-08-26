@@ -83,15 +83,30 @@ func (c *Client) Initialize(ctx context.Context) (*InitializeResponse, error) {
 	return &initResult, nil
 }
 
+// paginationParams builds the params object for the paginated list requests.
+// The "cursor" key is only set when the caller actually has a cursor from a
+// previous page: per the MCP pagination spec a cursor is an opaque token the
+// server issued, and servers SHOULD answer -32602 (Invalid params) for a cursor
+// they did not hand out. Sending "cursor": "" or "cursor": null on the first
+// page therefore breaks strict servers (the Ruby SDK rejects both non-numeric
+// strings, the TypeScript SDK rejects null) — the key has to be absent.
+func paginationParams(cursor *string) map[string]interface{} {
+	params := map[string]interface{}{}
+
+	if cursor != nil {
+		params["cursor"] = *cursor
+	}
+
+	return params
+}
+
 // ListTools retrieves the list of available tools from the server
 func (c *Client) ListTools(ctx context.Context, cursor *string) (*ToolsResponse, error) {
 	if !c.initialized {
 		return nil, errors.New("client not initialized")
 	}
 
-	params := map[string]interface{}{
-		"cursor": cursor,
-	}
+	params := paginationParams(cursor)
 
 	response, err := c.protocol.Request(ctx, "tools/list", params, nil)
 	if err != nil {
@@ -153,9 +168,7 @@ func (c *Client) ListPrompts(ctx context.Context, cursor *string) (*ListPromptsR
 		return nil, errors.New("client not initialized")
 	}
 
-	params := map[string]interface{}{
-		"cursor": cursor,
-	}
+	params := paginationParams(cursor)
 
 	response, err := c.protocol.Request(ctx, "prompts/list", params, nil)
 	if err != nil {
@@ -217,9 +230,7 @@ func (c *Client) ListResources(ctx context.Context, cursor *string) (*ListResour
 		return nil, errors.New("client not initialized")
 	}
 
-	params := map[string]interface{}{
-		"cursor": cursor,
-	}
+	params := paginationParams(cursor)
 
 	response, err := c.protocol.Request(ctx, "resources/list", params, nil)
 	if err != nil {
