@@ -57,6 +57,13 @@ func (t *HTTPClientTransport) WithHeader(key, value string) *HTTPClientTransport
 	return t
 }
 
+// SetHeader sets a header for all subsequent requests. Unlike WithHeader it does
+// not chain, so callers that cannot import this package can reach it through a
+// narrow interface (see the protocol version header set after initialize).
+func (t *HTTPClientTransport) SetHeader(key, value string) {
+	t.headers[key] = value
+}
+
 // Start implements Transport.Start
 func (t *HTTPClientTransport) Start(ctx context.Context) error {
 	// Does nothing in the stateless http client transport
@@ -95,13 +102,20 @@ func (t *HTTPClientTransport) Send(ctx context.Context, message *transport.BaseJ
 		return fmt.Errorf("failed to read response: %w", err)
 	}
 
-	if resp.StatusCode != http.StatusOK {
+	// Any 2xx is a success. A JSON-RPC notification or response has no reply, and
+	// the spec has the server acknowledge those with "202 Accepted with no body" —
+	// insisting on exactly 200 turned that correct answer into a transport error.
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		return fmt.Errorf("server returned error: %s (status: %d)", string(body), resp.StatusCode)
 	}
 
 	if t.McpSessionId == "" {
 		t.McpSessionId = resp.Header.Get("Mcp-Session-Id")
 	}
+
+	// Trimming first so an acknowledgement padded with a newline still counts as
+	// the empty body it is meant to be, instead of failing the JSON extraction.
+	body = bytes.TrimSpace(body)
 
 	if len(body) > 0 {
 		// Try to unmarshal as a response first
