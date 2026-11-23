@@ -7,7 +7,7 @@ import (
 	"net/http"
 	"sync"
 
-	"github.com/metoro-io/mcp-golang/transport"
+	"github.com/auxdata-ai/mcp-golang/transport"
 )
 
 // HTTPTransport implements a stateless HTTP transport for MCP

@@ -4,10 +4,23 @@ import (
 	"context"
 	"encoding/json"
 
-	"github.com/metoro-io/mcp-golang/internal/protocol"
-	"github.com/metoro-io/mcp-golang/transport"
+	"github.com/auxdata-ai/mcp-golang/internal1/protocol"
+	"github.com/auxdata-ai/mcp-golang/transport"
 	"github.com/pkg/errors"
 )
+
+// ClientProtocolVersion is the MCP protocol version advertised by the client in the
+// initialize request. MCP uses date-based protocol versions; modern servers (e.g.
+// GitLab) reject the previously hardcoded "1.0". The server negotiates down to a
+// version it supports.
+const ClientProtocolVersion = "2025-06-18"
+
+// headerSetter is implemented by transports that carry HTTP headers. Declared
+// here instead of referring to the http transport so this package keeps no
+// dependency on a concrete transport.
+type headerSetter interface {
+	SetHeader(key, value string)
+}
 
 // Client represents an MCP client that can connect to and interact with MCP servers
 type Client struct {
@@ -16,6 +29,14 @@ type Client struct {
 	capabilities *ServerCapabilities
 	initialized  bool
 	info         ClientInfo
+
+	// InitializedNotificationError holds the failure of the initialized
+	// notification, if any. Sending it is required by the lifecycle spec but not
+	// treated as fatal: servers that answer requests without it worked before it
+	// was ever sent, and failing the handshake over it would take them offline.
+	// Callers that want the detail can surface this; the next request reports the
+	// problem on its own for a server that does insist on the notification.
+	InitializedNotificationError error
 }
 
 // NewClient creates a new MCP client with the specified transport
@@ -53,7 +74,7 @@ func (c *Client) Initialize(ctx context.Context) (*InitializeResponse, error) {
 
 	// Make initialize request to server
 	response, err := c.protocol.Request(ctx, "initialize", map[string]interface{}{
-		"protocolVersion": "1.0",
+		"protocolVersion": ClientProtocolVersion,
 		"capabilities":    map[string]interface{}{},
 		"clientInfo":      c.info,
 	}, nil)
@@ -74,7 +95,37 @@ func (c *Client) Initialize(ctx context.Context) (*InitializeResponse, error) {
 
 	c.capabilities = &initResult.Capabilities
 	c.initialized = true
+
+	// Over HTTP the client MUST send MCP-Protocol-Version on every request after
+	// initialize, and it has to be the version negotiated here rather than
+	// ClientProtocolVersion: a server MUST answer 400 for a version it does not
+	// support, so echoing our wish instead of its answer would break older servers.
+	if setter, ok := c.transport.(headerSetter); ok && initResult.ProtocolVersion != "" {
+		setter.SetHeader("MCP-Protocol-Version", initResult.ProtocolVersion)
+	}
+
+	// The lifecycle spec closes the handshake with this notification; servers
+	// SHOULD NOT answer other requests before receiving it.
+	c.InitializedNotificationError = c.protocol.Notification("notifications/initialized", map[string]interface{}{})
+
 	return &initResult, nil
+}
+
+// paginationParams builds the params object for the paginated list requests.
+// The "cursor" key is only set when the caller actually has a cursor from a
+// previous page: per the MCP pagination spec a cursor is an opaque token the
+// server issued, and servers SHOULD answer -32602 (Invalid params) for a cursor
+// they did not hand out. Sending "cursor": "" or "cursor": null on the first
+// page therefore breaks strict servers (the Ruby SDK rejects both non-numeric
+// strings, the TypeScript SDK rejects null) — the key has to be absent.
+func paginationParams(cursor *string) map[string]interface{} {
+	params := map[string]interface{}{}
+
+	if cursor != nil {
+		params["cursor"] = *cursor
+	}
+
+	return params
 }
 
 // ListTools retrieves the list of available tools from the server
@@ -83,9 +134,7 @@ func (c *Client) ListTools(ctx context.Context, cursor *string) (*ToolsResponse,
 		return nil, errors.New("client not initialized")
 	}
 
-	params := map[string]interface{}{
-		"cursor": cursor,
-	}
+	params := paginationParams(cursor)
 
 	response, err := c.protocol.Request(ctx, "tools/list", params, nil)
 	if err != nil {
@@ -147,9 +196,7 @@ func (c *Client) ListPrompts(ctx context.Context, cursor *string) (*ListPromptsR
 		return nil, errors.New("client not initialized")
 	}
 
-	params := map[string]interface{}{
-		"cursor": cursor,
-	}
+	params := paginationParams(cursor)
 
 	response, err := c.protocol.Request(ctx, "prompts/list", params, nil)
 	if err != nil {
@@ -211,9 +258,7 @@ func (c *Client) ListResources(ctx context.Context, cursor *string) (*ListResour
 		return nil, errors.New("client not initialized")
 	}
 
-	params := map[string]interface{}{
-		"cursor": cursor,
-	}
+	params := paginationParams(cursor)
 
 	response, err := c.protocol.Request(ctx, "resources/list", params, nil)
 	if err != nil {

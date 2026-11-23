@@ -60,8 +60,9 @@ package stdio
 import (
 	"encoding/json"
 	"errors"
-	"github.com/metoro-io/mcp-golang/transport"
 	"sync"
+
+	"github.com/auxdata-ai/mcp-golang/transport"
 )
 
 // ReadBuffer buffers a continuous stdio stream into discrete JSON-RPC messages.

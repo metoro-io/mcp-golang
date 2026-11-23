@@ -21,7 +21,8 @@
 </div>
 
 # mcp-golang 
-
+This is a fork of [https://github.com/metoro-io/mcp-golang](https://github.com/metoro-io/mcp-golang)
+To get a fast fix for the http_client reading json
 mcp-golang is an unofficial implementation of the [Model Context Protocol](https://modelcontextprotocol.io/) in Go.
 
 Write MCP servers and clients in golang with a few lines of code.

@@ -2,10 +2,11 @@ package main
 
 import (
 	"fmt"
-	mcp_golang "github.com/metoro-io/mcp-golang"
-	"github.com/metoro-io/mcp-golang/transport/stdio"
 	"io"
 	"net/http"
+
+	mcp_golang "github.com/auxdata-ai/mcp-golang"
+	"github.com/auxdata-ai/mcp-golang/transport/stdio"
 )
 
 type WeatherArguments struct {

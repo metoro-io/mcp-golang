@@ -6,8 +6,8 @@ import (
 
 	"context"
 
-	mcp_golang "github.com/metoro-io/mcp-golang"
-	"github.com/metoro-io/mcp-golang/transport/stdio"
+	mcp_golang "github.com/auxdata-ai/mcp-golang"
+	"github.com/auxdata-ai/mcp-golang/transport/stdio"
 )
 
 func main() {

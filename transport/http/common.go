@@ -7,7 +7,7 @@ import (
 	"io"
 	"sync"
 
-	"github.com/metoro-io/mcp-golang/transport"
+	"github.com/auxdata-ai/mcp-golang/transport"
 )
 
 // baseTransport implements the common functionality for HTTP-based transports
