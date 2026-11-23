@@ -95,27 +95,35 @@ func (c EmbeddedResource) MarshalJSON() ([]byte, error) {
 	}
 }
 
-// Custom JSON unmarshaling for EmbeddedResource
+// Custom JSON unmarshaling for EmbeddedResource. A "blob" key marks binary
+// contents; everything else is text contents, including an empty text (which
+// is valid and must not fail the whole response).
 func (c *EmbeddedResource) UnmarshalJSON(data []byte) error {
-	// First try to unmarshal as TextResourceContents
-	var textResource TextResourceContents
-	err := json.Unmarshal(data, &textResource)
-	if err == nil && textResource.Text != "" {
-		c.EmbeddedResourceType = embeddedResourceTypeText
-		c.TextResourceContents = &textResource
-		return nil
+	var probe struct {
+		Blob *string `json:"blob"`
+		Text *string `json:"text"`
+	}
+	if err := json.Unmarshal(data, &probe); err != nil {
+		return fmt.Errorf("failed to unmarshal embedded resource: %v", err)
 	}
 
-	// Then try to unmarshal as BlobResourceContents
-	var blobResource BlobResourceContents
-	err = json.Unmarshal(data, &blobResource)
-	if err == nil && blobResource.Blob != "" {
+	if probe.Blob != nil && probe.Text == nil {
+		var blobResource BlobResourceContents
+		if err := json.Unmarshal(data, &blobResource); err != nil {
+			return fmt.Errorf("failed to unmarshal embedded resource: %v", err)
+		}
 		c.EmbeddedResourceType = embeddedResourceTypeBlob
 		c.BlobResourceContents = &blobResource
 		return nil
 	}
 
-	return fmt.Errorf("failed to unmarshal embedded resource: %v", err)
+	var textResource TextResourceContents
+	if err := json.Unmarshal(data, &textResource); err != nil {
+		return fmt.Errorf("failed to unmarshal embedded resource: %v", err)
+	}
+	c.EmbeddedResourceType = embeddedResourceTypeText
+	c.TextResourceContents = &textResource
+	return nil
 }
 
 type ContentType string
@@ -124,22 +132,63 @@ const (
 	// The value is the value of the "type" field in the Content so do not change
 	ContentTypeText             ContentType = "text"
 	ContentTypeImage            ContentType = "image"
+	ContentTypeAudio            ContentType = "audio"
 	ContentTypeEmbeddedResource ContentType = "resource"
+	ContentTypeResourceLink     ContentType = "resource_link"
 )
 
+// Audio provided to or from an LLM.
+type AudioContent struct {
+	// The base64-encoded audio data.
+	Data string `json:"data" yaml:"data" mapstructure:"data"`
+
+	// The MIME type of the audio.
+	MimeType string `json:"mimeType" yaml:"mimeType" mapstructure:"mimeType"`
+}
+
+// A link to a resource the server can provide (MCP spec 2025-06-18). The
+// resource is not embedded; the client may fetch it via resources/read.
+type ResourceLinkContent struct {
+	// The URI of the linked resource.
+	Uri string `json:"uri" yaml:"uri" mapstructure:"uri"`
+
+	// A programmatic name for the resource.
+	Name string `json:"name" yaml:"name" mapstructure:"name"`
+
+	// A human-readable title for the resource.
+	Title *string `json:"title,omitempty" yaml:"title,omitempty" mapstructure:"title,omitempty"`
+
+	// A description of what the resource represents.
+	Description *string `json:"description,omitempty" yaml:"description,omitempty" mapstructure:"description,omitempty"`
+
+	// The MIME type of the resource, if known.
+	MimeType *string `json:"mimeType,omitempty" yaml:"mimeType,omitempty" mapstructure:"mimeType,omitempty"`
+
+	// The size of the raw resource content in bytes, if known.
+	Size *int64 `json:"size,omitempty" yaml:"size,omitempty" mapstructure:"size,omitempty"`
+}
+
 type Content struct {
-	Type             ContentType
-	TextContent      *TextContent
-	ImageContent     *ImageContent
-	EmbeddedResource *EmbeddedResource
-	Annotations      *Annotations
+	Type                ContentType
+	TextContent         *TextContent
+	ImageContent        *ImageContent
+	AudioContent        *AudioContent
+	EmbeddedResource    *EmbeddedResource
+	ResourceLinkContent *ResourceLinkContent
+	Annotations         *Annotations
+
+	// Raw holds the complete JSON of a content block whose type this library
+	// does not know. Such a block is kept instead of failing the whole
+	// response; Type then carries the original type string.
+	Raw json.RawMessage
 }
 
 func (c *Content) UnmarshalJSON(b []byte) error {
 	type typeWrapper struct {
 		Type             ContentType       `json:"type" yaml:"type" mapstructure:"type"`
 		Text             *string           `json:"text" yaml:"text" mapstructure:"text"`
-		Image            *string           `json:"image" yaml:"image" mapstructure:"image"`
+		Data             string            `json:"data" yaml:"data" mapstructure:"data"`
+		MimeType         string            `json:"mimeType" yaml:"mimeType" mapstructure:"mimeType"`
 		Annotations      *Annotations      `json:"annotations" yaml:"annotations" mapstructure:"annotations"`
 		EmbeddedResource *EmbeddedResource `json:"resource" yaml:"resource" mapstructure:"resource"`
 	}
@@ -148,22 +197,31 @@ func (c *Content) UnmarshalJSON(b []byte) error {
 	if err != nil {
 		return err
 	}
+
+	c.Type = tw.Type
+	c.Annotations = tw.Annotations
+
 	switch tw.Type {
 	case ContentTypeText:
-		c.Type = ContentTypeText
+		text := ""
+		if tw.Text != nil {
+			text = *tw.Text
+		}
+		c.TextContent = &TextContent{Text: text}
 	case ContentTypeImage:
-		c.Type = ContentTypeImage
+		c.ImageContent = &ImageContent{Data: tw.Data, MimeType: tw.MimeType}
+	case ContentTypeAudio:
+		c.AudioContent = &AudioContent{Data: tw.Data, MimeType: tw.MimeType}
 	case ContentTypeEmbeddedResource:
-		c.Type = ContentTypeEmbeddedResource
+		c.EmbeddedResource = tw.EmbeddedResource
+	case ContentTypeResourceLink:
+		var link ResourceLinkContent
+		if err := json.Unmarshal(b, &link); err != nil {
+			return err
+		}
+		c.ResourceLinkContent = &link
 	default:
-		return fmt.Errorf("unknown content type: %s", tw.Type)
-	}
-
-	switch c.Type {
-	case ContentTypeText:
-		c.TextContent = &TextContent{Text: *tw.Text}
-	default:
-		return fmt.Errorf("unknown content type: %s", c.Type)
+		c.Raw = append(json.RawMessage(nil), b...)
 	}
 
 	return nil
@@ -186,13 +244,31 @@ func (c Content) MarshalJSON() ([]byte, error) {
 			return nil, err
 		}
 		rawJson = j
+	case ContentTypeAudio:
+		j, err := json.Marshal(c.AudioContent)
+		if err != nil {
+			return nil, err
+		}
+		rawJson = j
 	case ContentTypeEmbeddedResource:
-		j, err := json.Marshal(c.EmbeddedResource)
+		// The spec nests the contents under "resource".
+		j, err := json.Marshal(struct {
+			Resource *EmbeddedResource `json:"resource"`
+		}{c.EmbeddedResource})
+		if err != nil {
+			return nil, err
+		}
+		rawJson = j
+	case ContentTypeResourceLink:
+		j, err := json.Marshal(c.ResourceLinkContent)
 		if err != nil {
 			return nil, err
 		}
 		rawJson = j
 	default:
+		if len(c.Raw) > 0 {
+			return c.Raw, nil
+		}
 		return nil, fmt.Errorf("unknown content type: %s", c.Type)
 	}
 
@@ -241,6 +317,26 @@ func NewImageContent(base64EncodedStringData string, mimeType string) *Content {
 	return &Content{
 		Type:         ContentTypeImage,
 		ImageContent: &ImageContent{Data: base64EncodedStringData, MimeType: mimeType},
+	}
+}
+
+// NewAudioContent creates a new ToolResponse that is audio.
+// The given data is base64-encoded
+func NewAudioContent(base64EncodedStringData string, mimeType string) *Content {
+	return &Content{
+		Type:         ContentTypeAudio,
+		AudioContent: &AudioContent{Data: base64EncodedStringData, MimeType: mimeType},
+	}
+}
+
+// NewResourceLinkContent creates a new ToolResponse that links to a resource
+// instead of embedding it. Optional fields may be nil.
+func NewResourceLinkContent(uri string, name string, title *string, description *string, mimeType *string, size *int64) *Content {
+	return &Content{
+		Type: ContentTypeResourceLink,
+		ResourceLinkContent: &ResourceLinkContent{
+			Uri: uri, Name: name, Title: title, Description: description, MimeType: mimeType, Size: size,
+		},
 	}
 }
 
